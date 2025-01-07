@@ -3,8 +3,11 @@ title: "Vaupés eBird"
 author: "Orlando Acevedo-Charry, et al."
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 
 This code presents the analysis of eBird data from Mitú, Vaupés, in the easternmost Amazon region of Colombia. The aim is to use eBird data to evaluate community science contribution in a remote region of northwestern Amazonia.
@@ -90,14 +93,20 @@ colsE <- c("observer_id", "sampling_event_identifier",
            "duration_minutes", "effort_distance_km",
            "number_observers")
 
-ebd_filt<-auk_ebd("ebd_CO-VAU_smp_relMay-2024/ebd_CO-VAU_smp_relMay-2024.txt",
-                  file_sampling = "ebd_CO-VAU_smp_relMay-2024/ebd_CO-VAU_smp_relMay-2024_sampling.txt") %>%
+ebd_filt<-auk_ebd("ebd_CO-VAU_smp_relNov-2024/ebd_CO-VAU_smp_relNov-2024.txt",
+                  file_sampling = "ebd_CO-VAU_smp_relMay-2024/ebd_CO-VAU_smp_relNov-2024_sampling.txt") %>%
 #  auk_bbox(c(-70.378, 0.835,-69.851, 1.325)) %>% #W, S, E, N
   auk_filter(f_ebd, f_sed, overwrite=T, keep = colsE)
 
 #and with read_ebd I apply another filter to do not repeate records from groups
 sed_only <- read_sampling(f_sed)
 ebd_only <- read_ebd(f_ebd)
+
+#linea de tiempo
+ggplot(ebd_only, aes(x = year(observation_date), fill = protocol_type))+
+  geom_bar()+
+  theme_classic()
+  
 ```
 
 This dataset include "complete" and "incomplete" lists. Our first exploration could be regarding this categorical variable
@@ -261,6 +270,16 @@ Coarse <- ebd_count |>
          number_observers %in% c(1:10)) |>
   drop_na(observation_count) |>
   mutate(Grupo = "Coarse")
+
+```
+
+Este grupo será el de nuestro foco para analisar diversidad de aves en tiempo y espacio:
+```{r}
+Mitu <- Coarse |>
+  group_by(locality_id) |>
+  count() |>
+  filter(n>100) |> 
+  left_join(Coarse)
 ```
 
 4. "Room for improvement": incluir listas completas de cualquier otro protocolo, por mas de 5 horas o por mas de 5 km, e incluyendo mas de 10 observadores.
