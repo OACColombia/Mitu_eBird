@@ -3,8 +3,10 @@ title: "Vaupés eBird"
 author: "Orlando Acevedo-Charry, et al."
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
+    toc: yes
+    toc_float: true
+    number_sections: yes
     df_print: paged
 editor_options: 
   chunk_output_type: console
@@ -12,9 +14,9 @@ editor_options:
 
 This code presents the analysis of eBird data from Mitú, Vaupés, in the easternmost Amazon region of Colombia. The aim is to use eBird data to evaluate community science contribution in a remote region of northwestern Amazonia.
 
-Este código presenta el análisis de los datos de eBird de Mitú, Vaupés, en el borde oriental de la Amazonia colombiana. El objetivo es usar datos de eBird para evaluarl la contribución de ciencia comunitaria en una región remota de la Amazonia noroccidental.
+Este código presenta el análisis de los datos de eBird de Mitú, Vaupés, en el borde oriental de la Amazonia colombiana. El objetivo es usar datos de eBird para evaluar la contribución de ciencia comunitaria en una región remota de la Amazonia noroccidental.
 
-## Packages needed - Paquetes necesarios
+# Packages needed - Paquetes necesarios
 
 You will need to have some packages installed to access the data and manipulate it.
 
@@ -33,9 +35,12 @@ library(maps);
 library(gridExtra); 
 #Sankey plot with ggplot
 library(ggsankey) #should be installed via `devtools::install_github("davidsjoberg/ggsankey")`
+# GAM models - Modelos generalizados aditivos
+library(mgcv)
+
 ```
 
-## 1. eBird data download - descarga de datos de eBird
+# eBird data download - descarga de datos de eBird
 
 We download the eBird data in [eBird - Data Access](https://ebird.org/data/download) - you should be logged in.
 
@@ -67,17 +72,24 @@ Cuando la descarga esté lista, un correo electrónico a su cuenta le va a prove
 
 ![our working directory - nuestro directorio de trabajo](screenshots/eBird5.png)
 
-This folder has many files, the two files of our interest are `ebd_CO-VAU_smp_relMay-2024_sampling.txt` (sampling event data) and `ebd_CO-VAU_smp_relMay-2024.txt` (event data).
+This folder has many files, the two files of our interest are `ebd_CO-VAU_smp_relApr-2025_sampling.txt` (sampling event data) and `ebd_CO-VAU_smp_relApr-2025.txt` (event data).
 
-Esta carpeta tiene varios archivos, de nuestro interés son los dos archivos `ebd_CO-VAU_smp_relMay-2024_sampling.txt` (datos de evento de muestreo) and `ebd_CO-VAU_smp_relMay-2024.txt` (datos de evento).
+Esta carpeta tiene varios archivos, de nuestro interés son los dos archivos `ebd_CO-VAU_smp_relApr-2025_sampling.txt` (datos de evento de muestreo) and `ebd_CO-VAU_smp_relApr-2025.txt` (datos de registros durante el evento).
 
-## 2. eBird data exploration - explorando los datos de eBird
+# eBird data exploration - explorando los datos de eBird
 
 The downloaded data include all the Vaupes department, we can see the entire department and use filters to compare this data.
 
 Los datos descargados incluyen todo el Vaupés, posemos ver el departamento entero y usar filtros para compara los datos.
 
 ```{r}
+#Datos descargados eBird - a Diciembre 2024
+Vaupes_ebd <- "ebd_CO-VAU_smp_relApr-2025/ebd_CO-VAU_smp_relApr-2025.txt"
+Vaupes_sed <- "ebd_CO-VAU_smp_relApr-2025/ebd_CO-VAU_smp_relApr-2025_sampling.txt"
+
+#extension geográfica
+pamiwa <- c(-71, 0.85,-69.84, 1.7) #W, S, E, N
+
 f_ebd <- "temporal/ebd_Mitu.txt"                         #Data to be saved
 f_sed <- "temporal/sed_Mitu.txt"                         #Sampling event to be saved
 
@@ -87,25 +99,41 @@ colsE <- c("observer_id", "sampling_event_identifier",
            "common_name", "scientific_name",
            "observation_count",
            "state_code", "locality_id", "latitude", "longitude",
-           "protocol_type", "all_species_reported",
+           "protocol_name", "all_species_reported",
            "observation_date",
            "time_observations_started",
            "duration_minutes", "effort_distance_km",
            "number_observers")
 
-ebd_filt<-auk_ebd("ebd_CO-VAU_smp_relNov-2024/ebd_CO-VAU_smp_relNov-2024.txt",
-                  file_sampling = "ebd_CO-VAU_smp_relMay-2024/ebd_CO-VAU_smp_relNov-2024_sampling.txt") %>%
-#  auk_bbox(c(-70.378, 0.835,-69.851, 1.325)) %>% #W, S, E, N
-  auk_filter(f_ebd, f_sed, overwrite=T, keep = colsE)
+#Correr filtro
+ebd_filt <- auk_ebd(file = Vaupes_ebd,           #archivo de registros
+                  file_sampling = Vaupes_sed) |> #archivo de muestreo
+  auk_bbox(pamiwa) |>                            #extensión geográfica
+#  auk_species(aves_pamiwa) |>                    #lista de especies
+#  auk_protocol(c("Traveling", "Stationary")) |>  #los protocolos mas comunes
+#  auk_distance(distance = c(0,5)) |>             #eventos con distancias entre 0 y 5 km
+#  auk_duration(duration = c(0,300)) |>           #eventos con distancias entre 0 y 5 horas
+#    auk_complete() |>                            #solo listas completas
+    auk_filter(f_ebd,
+             f_sed,
+             overwrite=T,
+             keep = colsE)
+
 
 #and with read_ebd I apply another filter to do not repeate records from groups
 sed_only <- read_sampling(f_sed)
 ebd_only <- read_ebd(f_ebd)
 
 #linea de tiempo
-ggplot(ebd_only, aes(x = year(observation_date), fill = protocol_type))+
+ggplot(ebd_only, aes(x = year(observation_date), fill = protocol_name))+
   geom_bar()+
-  theme_classic()
+  scale_fill_viridis_d(direction = -1)+
+  labs(x = "Year of observation date / año de observación",
+       y = "Count / conteo",
+       fill = "Protocol / protocolo") +
+  theme_classic()+
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.25,0.65))
   
 ```
 
@@ -119,9 +147,9 @@ ebd_only %>%
   summarise(n_records = n())
 ```
 
-Another exploration is the geographic extend of sampling effort (we can use `sed_only`). A simple map will be help to see where in the department eBird has been used.
+Another exploration is the geographic extend of sampling effort (we can use `sed_only`). A simple map will be help to see where eBird has been used.
 
-Otra exploración es la extensión geográfica del esfuerzo de muestreo (podemos usar `sed_only`). Un simple mapa nos ayudará a ver donde eBird se ha usado en el departamento.
+Otra exploración es la extensión geográfica del esfuerzo de muestreo (podemos usar `sed_only`). Un simple mapa nos ayudará a ver donde eBird se ha usado en el territorio.
 
 ```{r}
 #A global map to make figures ###
@@ -129,14 +157,16 @@ world1 <- sf::st_as_sf(maps::map(database = 'world', plot = FALSE, fill = TRUE))
 
 ggplot()+
   geom_sf(data = world1)+
-  coord_sf(xlim = c(-71.477, -69.353), 
-           ylim =  c(-1.10711, 1.35211)) +
+  coord_sf(xlim = c(-70.6, -69.94),
+           ylim =  c(0.85, 1.4)) +
   geom_point(data = sed_only, 
              aes(x = longitude, y = latitude), 
              size = 0.5, 
              alpha = 0.25)+
   labs(title = "eBird Sampling effort in Vaupés, Colombia")+
-  theme_bw()
+  theme_bw() 
+
+write_csv(sed_only, "sampling_points_mitu.csv")
 
 ```
 
@@ -144,17 +174,17 @@ We can explore the data filtered to our study site, and assess different aspects
 
 Podemos explorar los datos filtrados en nuestro sitio de estudio y evaluar diferentes aspectos, como el numero de listas por protocolo o esfuerzo espacio temporal.
 
-### 2.1 Protocol type - tipo de protocolo
+## Protocol name - tipo de protocolo
 
 ```{r}
 #Explore some sampling effort information - Protocol type
 
-print(table(ebd_only$protocol_type)) #to see the names and overall count
+print(table(ebd_only$protocol_name)) #to see the names and overall count
 
 ebd_only %>%
-  group_by(sampling_event_identifier, protocol_type) %>% 
+  group_by(sampling_event_identifier, protocol_name) %>% 
   summarise() %>% 
-  ggplot(aes(x = factor(protocol_type, 
+  ggplot(aes(x = factor(protocol_name, 
                         levels = c("Traveling",
                                    "Stationary",
                                    "Incidental",
@@ -171,9 +201,9 @@ ebd_only %>%
 
 #which checklist includes "Banding" or "Area" protocols?
 
-ebd_only |>
-  filter(protocol_type %in% c("Banding", "Area")) |>
-  select(sampling_event_identifier) |>
+ebd_only |> 
+  filter(protocol_name %in% c("Banding", "Area")) |>
+  dplyr::select(sampling_event_identifier) |>
   unique()
 
 ```
@@ -181,15 +211,11 @@ ebd_only |>
 We can see that two checklists include "Banding" or "Area" protocols. "Banding" records came from the checklists [S36819056](https://ebird.org/checklist/S36819056). This list occurred during mist netting activity (Agripino González with the Sinchi Institute), but for sure the list do not report only the captured birds for banding (best recommendation). When working with mist nets, we should submit two separated lists: one with all the birds heard or seen (but not captured) under "Traveling" or "Stationary", and one ONLY with the captured birds. On the other hand, records by "Area" checklist came from [S55879500](https://ebird.org/checklist/S55879500), by a "group" account submission. Group accounts should not report the list primarily, because we do not have a person to contact. This protocol is very exhaustive for rigorous surveys, thus it might be a "Traveling" list.
 
 
-Podemos ver que hay dos listas que incluyen "Anillamiento" o "Busqueda intensa por área". Los registros de la lista de "Anillamiento" son de [S36819056](https://ebird.org/checklist/S36819056). Esta lista ocurrió durante actividad de redes de niebla (Agripino González con el Instituto Sinchi),pero la lista seguramente no está reportando solo las aves caputradas para anillar (mejor recomendación).Cuando se trabaje con redes de niebla, uno deberia someter dos listas separadas: una para las aves vistas y escuchadas (pero no capturadas) siguiendo protocolos de "desplazamiento" o "estacionario", y otra SOLO con las aves capturadas. Por otro lado, los registros de la lista de "Busqueda intensa por área" vienen de [S55879500](https://ebird.org/checklist/S55879500), sometida por una cuenta grupal. Las cuentas grupales no deben reportar las listas, pues no tenemos una persona real de contacto. Este protocolo es muy exahustivo para muestreos rigurosos y repetitivos, entonces tal vez debería responder mas a "desplazamiento".
+Podemos ver que hay dos listas que incluyen "Anillamiento" o "Busqueda intensa por área". Los registros de la lista de "Anillamiento" son de [S36819056](https://ebird.org/checklist/S36819056). Esta lista ocurrió durante actividad de redes de niebla (Agripino González con el Instituto Sinchi), pero la lista seguramente no está reportando solo las aves capturadas para anillar (mejor recomendación).Cuando se trabaje con redes de niebla, uno deberia someter dos listas separadas: una para las aves vistas y escuchadas (pero no capturadas) siguiendo protocolos de "desplazamiento" o "estacionario", y otra SOLO con las aves capturadas. Por otro lado, los registros de la lista de "Busqueda intensa por área" vienen de [S55879500](https://ebird.org/checklist/S55879500), sometida por una cuenta grupal. Las cuentas grupales no deben reportar las listas, pues no tenemos una persona real de contacto. Este protocolo es muy exahustivo para muestreos rigurosos y repetitivos, entonces tal vez debería responder mas a "desplazamiento".
 
-
-We will focus in "best practices" records from "Traveling" and "Stationary" protocols. We can also explore the effort (duration, distance, observers, hour of sampling).
+## Effort data
 
 First, we have to do some adjustment to the data:
-
-
-Vamos a enfocarnos en los registros con "mejores prácticas" dentro de los protocolos "desplazamiento" y "estacionario". Podemos tambien explorar el esfuerzo (duracion, distancia, # observadores, horas de muestreo).
 
 Primero debemos hacer algunos ajustes a los datos:
 
@@ -206,7 +232,7 @@ ebd_count <- ebd_only %>%
     # We don't have here count in X to convert to NA
     observation_count = as.integer(observation_count),
     # effort_distance_km to 0 for non-travelling counts
-    effort_distance_km = if_else(protocol_type == "Stationary",
+    effort_distance_km = if_else(protocol_name %in% c("Stationary"),
                                  0, effort_distance_km),
     #effort_distance_km change to integer no decimals
     effort_distance_kmI = round(effort_distance_km, digits = 0),
@@ -216,11 +242,19 @@ ebd_count <- ebd_only %>%
     year = year(observation_date),
     month = month(observation_date),
     week = week(observation_date),
-    day_of_year = yday(observation_date))
+    day_of_year = yday(observation_date)) |>
+  # some groups report number of observers, but historic and incidental has NA
+    # let's count the observer_id per checklist and species that report there
+  group_by(checklist_id, scientific_name) |>
+  mutate(eBirders = str_count(paste(unique(observer_id),
+                                    collapse = ","), ",") +1) |>
+  ungroup() |>
+  mutate(number_observers = ifelse(is.na(number_observers), eBirders, number_observers))
 
 ebd_count <- ebd_count |>
-  group_by(sampling_event_identifier) |>
-  summarise(Total_ind = sum(observation_count, na.rm = T)) |>
+  group_by(checklist_id) |>
+  summarise(Total_ind = sum(observation_count, na.rm = T),
+            SppRichness = n_distinct(scientific_name)) |>
   left_join(ebd_count)
 
 ```
@@ -229,168 +263,1043 @@ With this, we can assign each observation to different groups.
 
 Con esto, podemos asignar cada observación a diferentes grupos.
 
-## 3. Assigning each record to detail of sampling - asignando cada registro en referencia al detalle de muestreo
+## Assigning each record to detail of sampling - asignando cada registro en referencia al detalle de muestreo
 
 Podemos plantear diferentes niveles de resolución de esfuerzo, el primer paso para saber cómo analizar estos datos:
 
 1. "Ultrafine": una resolución super fina incluye solo listas compeltas, estacionarias, por un solo observador, entre 20-30 minutos, reportando al menos 15 individuos, e incluyendo estimación de abundancia para cada especie. A esta o la siguiente (Fine) deberíamos apuntar a llegar!
 
-```{r}
-Ultrafine <- ebd_count |>
-  filter(all_species_reported == "TRUE",
-         protocol_type == "Stationary",
-         number_observers == 1,
-         duration_minutes %in% c(20:30),
-         Total_ind >= 15) |>
-  drop_na(observation_count) |>
-  mutate(Grupo = "Ultrafine")
-```
-
 2. "Fine": resolución fina (interesante para encontrar bosques de arenas blancas). Solo listas completas, de "traveling" o "stationary" con un esfuerzo ≥1 km o entre 5 minutos a 1 hora, hasta 10 observadores, e incluyendo estimación de abundancia para cada especie.
-
-```{r}
-Fine <- ebd_count |>
-  filter(all_species_reported == "TRUE",
-         protocol_type %in% c("Stationary", "Traveling"),
-         duration_minutes %in% c(5:60),
-         effort_distance_kmI %in% c(0:1),
-         number_observers %in% c(1:10)) |>
-  drop_na(observation_count)|>
-  mutate(Grupo = "Fine")
-```
 
 3. "Coarse": resolución gruesa, pero es la estandarizada que se usa a nivel mundial en escalas macroecológicas. Incluye listas completas de "traveling" o "stationary" con un esfuerzo ≥5 km o entre 5 minutos a 5 horas (300 minutos) de muestreo, hasta 10 observadores, y que incluyan estimación de abundancia de las especies reportadas.
 
-```{r}
-Coarse <- ebd_count |>
-  filter(all_species_reported == "TRUE",
-         protocol_type %in% c("Stationary", "Traveling"),
-         duration_minutes %in% c(5:300),
-         effort_distance_kmI %in% c(0:5), 
-         number_observers %in% c(1:10)) |>
-  drop_na(observation_count) |>
-  mutate(Grupo = "Coarse")
-
-```
-
-Este grupo será el de nuestro foco para analisar diversidad de aves en tiempo y espacio:
-```{r}
-Mitu <- Coarse |>
-  group_by(locality_id) |>
-  count() |>
-  filter(n>100) |> 
-  left_join(Coarse)
-```
-
-4. "Room for improvement": incluir listas completas de cualquier otro protocolo, por mas de 5 horas o por mas de 5 km, e incluyendo mas de 10 observadores.
-
-```{r}
-ToImprove <- ebd_count |>
-  filter(all_species_reported == "TRUE",
-         protocol_type %in% c("Area",
-                              "Banding",
-                              "Historical",
-                              "Incidental") |
-         duration_minutes %in% c(1:4,300:1440) | 
-         effort_distance_kmI > 5 |
-         number_observers > 10 |
-         is.na(observation_count)) |>
-  mutate(Grupo = "ToImprove")
-```
+4. "To improve": incluir listas completas de cualquier otro protocolo, por mas de 5 horas o por mas de 5 km, e incluyendo mas de 10 observadores.
 
 5. "Incomplete" son las listas correctamente identificadas como incompletas, las cuales al momento de analizar, por lo general, se filtran, pues no hay certeza de algunos aspectos del muestreo.
 
 ```{r}
-Incomplete <- ebd_count |>
-  filter(all_species_reported == "FALSE") |>
-  mutate(Grupo = "Incomplete")
-```
-
-Combinar ahora los grupos
-
-```{r}
-Grupos <- rbind(Ultrafine, Fine, Coarse, ToImprove, Incomplete)
 
 ebd_eff <- ebd_count |>
-  left_join(Grupos) #some checklists classify in different groups
-
-table(ebd_eff$Grupo)
-
-nrow(ebd_eff)-sum(41276,6941,8800,72677,102)
-
+  mutate(category = ifelse((all_species_reported == "TRUE") &
+                             (protocol_name == "Stationary") &
+                             (number_observers == 1) &
+                             (duration_minutes %in% c(20:30)) &
+                             (Total_ind >= 15) &
+                             (!is.na(observation_count)), 
+                           "Ultrafine",
+                     ifelse((all_species_reported == "FALSE"), 
+                            "Not applicable",
+                     ifelse((all_species_reported == "TRUE") &
+                             (protocol_name %in% c("Stationary",
+                                                   "Traveling")) &
+                             (number_observers %in% c(1:10)) &
+                             (duration_minutes %in% c(10:60)) &
+                             (effort_distance_kmI %in% c(0:1)) &
+                             (!is.na(observation_count)), 
+                            "Fine",
+                     ifelse((all_species_reported == "TRUE") &
+                             (protocol_name %in% c("Stationary",
+                                                   "Traveling")) &
+                             (number_observers %in% c(1:10)) &
+                             (duration_minutes %in% c(10:300)) &
+                             (effort_distance_kmI %in% c(0:5)) &
+                             (!is.na(observation_count)), 
+                            "Coarse",
+                     ifelse((all_species_reported == "TRUE") |
+                             (number_observers > 10) |
+                             (duration_minutes %in% c(1:9,300:5000)) |
+                             (is.na(duration_minutes)) |
+                             (effort_distance_kmI > 5) |
+                             (is.na(observation_count)), 
+                            "To improve",
+                           "other"
+                           ))))))
 ```
 
-## 4. Distribution of the records - distribución de los registros
+
+# Distribution of the records - distribución de los registros
 
 Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
 
+
 ```{r}
-ebd_eff <- ebd_eff |>
-  mutate(All = "eBird Vaupés (CO) - 122,796",
-         Lists = case_when(all_species_reported == FALSE ~ "b. Incomplete - 6.8%",
-                              all_species_reported == TRUE ~"a. Complete - 93.2%"),
-         Protocol = case_when(protocol_type == "Area" ~ "e. Area and Banding - <1%",
-                              protocol_type == "Banding" ~ "e. Area and Banding - <1%",
-                              protocol_type == "Historical" ~ "b. Historical - 6.4%",
-                              protocol_type == "Incidental" ~ "d. Incidental - 3.9%",
-                              protocol_type == "Stationary" ~ "c. Stationary - 4.8%",
-                              protocol_type == "Traveling" ~ "a. Traveling - 84.8%"),
-         Duration = case_when(duration_minutes %in% c(1:5) ~ "a. 1-5 minutes - <1%",
-                              duration_minutes %in% c(5:20) ~ "b. 5-20 minutes - 3.3%",
-                              duration_minutes %in% c(20:30) ~ "c. 20-30 minutes - 2.3%",
-                              duration_minutes %in% c(30:60) ~ "d. 0.5-1 hour - 6.6%",
-                              duration_minutes %in% c(60:300) ~ "e. 1-5 hours - 37.0%",
-                              duration_minutes > 300 ~ "f. >5 hours - 41.5%",
-                              is.na(duration_minutes) ~ "NA - 8.5"),
-         Distance = case_when(effort_distance_kmI %in% c(0:1) ~ "a. < 1 km - 18.8%",
-                              effort_distance_kmI %in% c(1:2) ~ "b. 1-2 km - 11.1%",
-                              effort_distance_kmI %in% c(2:5) ~ "c. 2-5 km - 28.1%",
-                              effort_distance_kmI > 5 ~ "d. >5 km - 32.3%",
-                              is.na(effort_distance_kmI) ~ "NA - 9.6%"),
-         Observers = case_when(number_observers %in% c(1) ~ "a. 1 eBirder - 12.6%",
-                               number_observers %in% c(2:5) ~ "b. 2-5 eBirders - 55.4%",
-                               number_observers %in% c(5:10) ~ "c. 5-10 eBirders - 22.1%",
-                              number_observers %in% c(10:20) ~ "d. 10-20 eBirders - 5.6%",
-                              number_observers >20 ~ "e. >20 eBirders - <1%",
-                              is.na(number_observers) ~ "NA - 4.3%"),
-         Category = case_when(Grupo == "Ultrafine" ~ "a. Ultrafine - <1%",
-                              Grupo == "Fine" ~ "b. Fine - 5.3%",
-                              Grupo == "Coarse" ~ "c. Coarse - 31.8%",
-                              Grupo == "ToImprove" ~ "d. Room for improvement - 56.0%",
-                              Grupo == "Incomplete" ~ "e. Correctly removed - 6.7%",
-                              is.na(Grupo) ~ "Not Aplicable"))
+ebd_sankey <- ebd_eff |>
+  mutate(All = "eBird data",
+         `Type of list` = case_when(all_species_reported == FALSE ~ "Incomplete",
+                              all_species_reported == TRUE ~"Complete"),
+         Protocol = case_when(protocol_name == "Area" ~ "Other",
+                              protocol_name == "Banding" ~ "Other",
+                              protocol_name == "Historical" ~ "Other",
+                              protocol_name == "Incidental" ~ "Other",
+                              protocol_name == "Stationary" ~ "Stationary",
+                              protocol_name == "Traveling" ~ "Traveling"),
+         Duration = case_when(duration_minutes %in% c(1:9) ~ "1-9 min",
+                              duration_minutes %in% c(10:20) ~ "10-20 min",
+                              duration_minutes %in% c(20:30) ~ "20-30 min",
+                              duration_minutes %in% c(30:60) ~ "0.5-1 hr",
+                              duration_minutes %in% c(60:300) ~ "1-5 hrs",
+                              duration_minutes > 300 ~ ">5 hrs",
+                              is.na(duration_minutes) ~ "No duration"),
+         Distance = case_when(effort_distance_kmI %in% c(0) ~ "0 km",
+                              effort_distance_kmI %in% c(0:1) ~ "<1 km",
+                              effort_distance_kmI %in% c(1:5) ~ "1-5 km",
+                              effort_distance_kmI > 5 ~ ">5 km",
+                              is.na(effort_distance_kmI) ~ "No distance"),
+         Observers = case_when(number_observers %in% c(1) ~ "1",
+                               number_observers %in% c(2:10) ~ "2-10",
+                               number_observers >10 ~ ">10"))
 
-dfVA_CO <- ebd_eff |>
-  make_long(All, Lists, Protocol, Duration, Distance, Observers, Category)
+dfVA_CO <- ebd_sankey |>
+  make_long(All, `Type of list`, Protocol, Duration, Distance, Observers, category)
 
-ggplot(dfVA_CO, aes(x = x, next_x = next_x, node = node, next_node = next_node, fill = factor(node), label = node)) +
-  geom_sankey(flow.alpha = .6,
-              node.color = "gray30") +
-  geom_sankey_label(size = 2.5, color = "white", fill = "gray40") +
-  scale_fill_viridis_d(drop = FALSE) +
-  theme_sankey(base_size = 18) +
+dagg <- dfVA_CO |>
+  group_by(node) |>
+  tally() |>
+  mutate(pct = round((n/nrow(ebd_eff))*100, 1))
+
+sankey_data_n = merge(dfVA_CO, dagg, by.x = 'node', by.y = 'node',
+                      all.x = TRUE)
+
+sankey_data_n$node <- factor(sankey_data_n$node, 
+                             levels = c("eBird data",
+                                        "Incomplete","Complete",
+                                        "Other", "Traveling","Stationary", 
+                                        "No duration",">5 hrs","1-5 hrs","0.5-1 hr","20-30 min", "10-20 min", "1-9 min",
+                                        "No distance",">5 km","1-5 km","<1 km","0 km",
+                                        ">10","2-10","1",
+                                        "Not applicable", "To improve", "Coarse", "Fine", "Ultrafine"))
+
+sankey_data_n$next_node <- factor(sankey_data_n$next_node, 
+                             levels = c("eBird data",
+                                        "Incomplete","Complete",
+                                        "Other", "Traveling","Stationary", 
+                                        "No duration",">5 hrs","1-5 hrs","0.5-1 hr","20-30 min", "10-20 min", "1-9 min",
+                                        "No distance",">5 km","1-5 km","<1 km","0 km",
+                                        ">10","2-10","1",
+                                        "Not applicable", "To improve", "Coarse", "Fine", "Ultrafine"))
+
+ggplot(sankey_data_n, aes(x = x,
+                          next_x = next_x,
+                          node = node,
+                          next_node = next_node,
+                          fill = factor(node),
+                          color = factor(node),
+                          label = paste0(node, " (", pct, "%)"))) +
+  geom_sankey(flow.alpha = 0.5, node.color = "black", 
+              show.legend = F)+
+  geom_sankey_label(size = 3, color = "black", fill = "white",
+                    alpha = 0.75,hjust = -0.1,vjust = 0) +
   labs(x = NULL) +
-  theme(legend.position = "none",
-        plot.title = element_text(hjust = .5)) +
-  ggtitle("Vaupés - eBird data")
+  scale_fill_manual(values = c("eBird data" = "darkgray",
+                               "Incomplete" = "#FDE725",
+                               "Complete" = "#440154",
+                               "Other" = "#29AF7F",
+                               "Traveling" = "#482677",
+                               "Stationary" = "#440154", 
+                               "No duration" = "#FDE725",
+                               ">5 hrs" = "#DCE318",
+                               "1-5 hrs" = "#B8DE29",
+                               "0.5-1 hr" = "#3F4788",
+                               "20-30 min" = "#440154",
+                               "10-20 min" = "#482677",
+                               "1-9 min" = "#29AF7F",
+                               "No distance"= "#FDE725",
+                               ">5 km" = "#DCE318",
+                               "1-5 km" = "#2D718E",
+                               "<1 km" = "#482677",
+                               "0 km" = "#440154",
+                               ">10" = "#29AF7F",
+                               "2-10" = "#3F4788",
+                               "1" = "#440154",
+                               "Not applicable" = "#FDE725",
+                               "To improve" = "#74D055",
+                                "Coarse" = "#3F4788",
+                               "Fine" = "#482677",
+                               "Ultrafine" = "#440154")) +
+  scale_color_manual(values = c("eBird data" = "darkgray",
+                               "Incomplete" = "#FDE725",
+                               "Complete" = "#440154",
+                               "Other" = "#29AF7F",
+                               "Traveling" = "#482677",
+                               "Stationary" = "#440154", 
+                               "No duration" = "#FDE725",
+                               ">5 hrs" = "#DCE318",
+                               "1-5 hrs" = "#B8DE29",
+                               "0.5-1 hr" = "#3F4788",
+                               "20-30 min" = "#440154",
+                               "10-20 min" = "#482677",
+                               "1-9 min" = "#29AF7F",
+                               "No distance"= "#FDE725",
+                               ">5 km" = "#DCE318",
+                               "1-5 km" = "#2D718E",
+                               "<1 km" = "#482677",
+                               "0 km" = "#440154",
+                               ">10" = "#29AF7F",
+                               "2-10" = "#3F4788",
+                               "1" = "#440154",
+                               "Not applicable" = "#FDE725",
+                               "To improve" = "#74D055",
+                               "Coarse" = "#3F4788",
+                               "Fine" = "#482677",
+                               "Ultrafine" = "#440154")) +
+  scale_x_discrete(expand = expansion(add = c(0.2,1)))+
+  theme_sankey()+
+  theme(axis.text.x = element_text(hjust = -0.1, size = 12))
+
+ggsave(filename = "Fig4_SankeyPlot.png", dpi = 600,
+       units = "mm", width = 250, height = 110)
 
 ```
 
-Aquí se ve que la mayor cantidad de datos de eBird desde Vaupés pueden mejorar (55.88%). Si se usa una resolución gruesa de muestreo, solo ~32% de los datos es utilizable. Para preguntas que requieren detallada información espacio temporal hay muy pocos registros (resolución fina 5%, resolución ultra fina <1%). 
+Aquí se ve que la mayor cantidad de datos de eBird desde Vaupés pueden mejorar (56.3%). Si se usa una resolución gruesa de muestreo, solo un poco mas del 30% de los datos es utilizable. Para preguntas que requieren detallada información espacio temporal hay muy pocos registros (resolución fina 6%, resolución ultra fina 0.1%). 
 
-Otra opción es hacero "alluvial"
+# Species richness of birds in Pamiwã - Riqueza de especies de aves en Pamiwã
 
 ```{r}
-ggplot(dfVA_CO, aes(x = x, next_x = next_x, node = node, next_node = next_node, fill = factor(node), label = node)) +
-  geom_alluvial(flow.alpha = .6,
-              node.color = "gray30") +
-  geom_alluvial_label(size = 2, color = "white", fill = "gray40") +
-  scale_fill_viridis_d(drop = FALSE) +
-  theme_alluvial(base_size = 18) +
-  labs(x = NULL) +
-  theme(legend.position = "none",
-        plot.title = element_text(hjust = .5),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank()) +
-  ggtitle("Vaupés - eBird data")
+#lista de especies
+aves_pamiwa <- read_csv("pamiwa_calendar.csv")
+
+# cambiar a recientes cambios del nombre de algunas especies y corregir errores
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Vanellus cayanus")] = "Hoploxypterus cayanus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Celeus grammicus")] = "Celeus undatus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Bubulcus ibis")] = "Ardea ibis"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Campephilus melanoleucus")] = "Campephilus melanoleucos"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Cyanerpes cyaenus")] = "Cyanerpes cyaneus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Dixiphia pipra")] = "Pseudopipra pipra"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Gymnopithys leucaspi")] = "Gymnopithys leucaspis"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Gálbula dea")] = "Galbula dea"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Gálbula leucogastra")] = "Galbula leucogastra"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Heterocerus flavivertex")] = "Heterocercus flavivertex"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Ixothraupis xantogastra")] = "Ixothraupis xanthogastra"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Machaeropterus regulus")] = "Machaeropterus striolatus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Nomonyx domincus")] = "Nomonyx dominicus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Nyctibius bracteatus")] = "Phyllaemulor bracteatus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Othopsittaca manilatus")] = "Orthopsittaca manilatus"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Sturnella militaris")] = "Leistes militaris"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Tangara nigrocincta")] = "Stilpnia nigrocincta"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Tangara nigrocinta")] = "Stilpnia nigrocincta"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Tersina veridis")] = "Tersina viridis"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Todirostrum chysocrotaphum")] = "Todirostrum chrysocrotaphum"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Veniliornis affinis")] = "Dryobates affinis"
 ```
+
+riqueza de especies por season
+```{r}
+pamiwa_richness <- aves_pamiwa |>
+  mutate(Season = ifelse(Season == "Dry", "Ihirimi",
+                  ifelse(Season == "Rain", "Okorimi",
+                  ifelse(Season == "Transition", "Pamurimi",
+                  Season))),
+         month = ifelse(Month == "January",1,
+                 ifelse(Month == "February",2,
+                 ifelse(Month == "March",3,
+                 ifelse(Month == "April",4,
+                 ifelse(Month == "May",5,
+                 ifelse(Month == "June",6,
+                 ifelse(Month == "July",7,
+                 ifelse(Month == "August",8,
+                 ifelse(Month == "September",9,
+                 ifelse(Month == "October",10,
+                 ifelse(Month == "November",11,
+                 ifelse(Month == "December",12,
+                 Month))))))))))))) |>
+  rename(scientific_name = Scientific) |>
+  group_by(Season, month, scientific_name) |>
+  count() |>
+  group_by(Season, month) |>
+  count() |>
+  arrange(as.numeric(month))
+pamiwa_richness
+
+```
+
+Y podemos comparar la riqueza por season en eBird.
+
+Primero, hacer un "summary" de el promedio mensual de riqueza por estacion climática
+```{r}
+eBird_S_montly <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(Season, year, month, scientific_name) |>
+  count() |> 
+  group_by(Season, year, month) |>
+  count() |>
+  group_by(Season, month) |>
+  summarise(meanSpp = mean(n),
+            sdSpp = sd(n),
+            n = n()) |>
+  arrange(month)
+
+eBird_S_montly
+```
+
+Y luego hacer el computo del Cohen's d
+
+$$
+d_{z_{i}}=\frac{\overline{x}_{i}-\mu_{i}}{s_{i}}*K_i
+$$
+
+where $K_i$ is a correction factor for small sample sizes of Cohen's $d_z$
+
+$$
+K_i = \frac{n_i - 3}{n_i - 2.25}*\sqrt{\frac{n_i-2}{n_i}}
+$$
+
+```{r}
+Cohens_d_montly <- eBird_S_montly |>
+  ungroup() |>
+  mutate(
+    muSpp_i = pamiwa_richness$n,
+    d_i = ((meanSpp-muSpp_i)/sdSpp),
+    K_i = ((n-3)/(n-2.25)) * sqrt((n-2)/n),
+    d = d_i * K_i,
+    df = n - 1,
+    se_d = sqrt(n / df + (d^2) / (2 * df)),
+    t_crit80 = qt(1 - 0.2 / 2, df),
+    CIlower80 = d - t_crit80 * se_d,
+    CIupper80 = d + t_crit80 * se_d,
+    t_crit95 = qt(1 - 0.05 / 2, df),
+    CIlower95 = d - t_crit95 * se_d,
+    CIupper95 = d + t_crit95 * se_d,
+    size_d = ifelse(d>0.8, 4,
+                    ifelse(d<0.5, 3,
+                    3.5))
+    ) |>
+  as.data.frame()
+Cohens_d_montly
+```
+
+Y hacer figura
+```{r}
+SppRich_a <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(Season, year, month, scientific_name) |>
+  count() |> 
+  group_by(Season, year, month) |>
+  count() |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = n,
+             color = factor(Season,
+                      levels = c("Pamurimi",
+                                 "Ihirimi",
+                                 "Okorimi")),
+             fill = factor(Season,
+                      levels = c("Pamurimi",
+                                 "Ihirimi",
+                                 "Okorimi"))))+
+#  geom_violin(alpha = 0.1) +
+    geom_boxplot(alpha = 0.1, outlier.shape = "x", outlier.color = "gray") +
+    geom_jitter(alpha = 0.1, width = 0.1)+
+#    geom_pointrange(data = Cohens_d_montly,
+#                    aes(y = meanSpp,
+#                        ymin = meanSpp - (sdSpp),
+#                        ymax = meanSpp + (sdSpp)),
+#             position = position_nudge(0.2)) +
+    geom_point(data = Cohens_d_montly,
+                    aes(y = muSpp_i,
+                      color = factor(Season,
+                                   levels = c("Pamurimi",
+                                              "Ihirimi",
+                                              "Okorimi"))),
+               position = position_nudge(-0.2),
+               size = 4,
+              shape = 8) +
+  labs(x = "Month",
+       color = "Season",
+       fill = "Season",
+       y = "Montly species richness",
+       tag = "(a)") +
+  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  scale_y_continuous(expand = c(0,0), 
+                     limits = c(0,380))+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+  theme_classic() +
+  theme(legend.text = element_text(face = "italic"),
+        axis.ticks = element_blank(),
+        legend.position = "bottom",
+        axis.title.x = element_blank())
+SppRich_a
+
+SppRich_b <- ggplot(Cohens_d_montly, 
+                    aes(x = factor(month, 
+                                   levels = c(8:12,1:7)),
+                        color = factor(Season,
+                                       levels = c("Pamurimi",
+                                                  "Ihirimi",
+                                                  "Okorimi")), 
+                     y = d))+
+    geom_hline(yintercept = 0, linetype = "dashed",
+               color = "darkgray")+
+    geom_hline(yintercept = c(0.8,-0.8), linetype = "dotted",
+               color = "darkgray")+
+    geom_linerange(aes(ymin = CIlower95, 
+                       ymax = CIupper95),
+                   alpha = 0.75, linewidth = 1)+
+    geom_linerange(aes(ymin = CIlower80, 
+                       ymax = CIupper80),
+                   alpha = 0.75, linewidth = 2)+
+    geom_point(aes(size = factor(size_d)),
+               alpha = 0.95)+
+    labs(x = "Month",
+         color = "Season",
+         y = expression("Effect size (Cohen's"~italic(d[z])~")"),
+         tag = "(b)")+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+
+  theme_classic()+
+  theme(legend.text = element_text(face = "italic"), 
+        legend.position = "none")
+SppRich_b
+
+cowplot::plot_grid(SppRich_a, SppRich_b,
+             ncol = 1)
+
+ggsave(filename = "Fig4_speciesRichness.png", dpi = 600,
+       units = "mm", width = 173, height = 150)
+
+```
+
+
+# Relative seasonal presence (Indigenous calendar) and Relative abundance (eBird)
+
+```{r}
+
+# Abundancia relativa
+pamiwa_presence <- aves_pamiwa |>
+  mutate(Season = ifelse(Season == "Dry", "Ihirimi",
+                  ifelse(Season == "Rain", "Okorimi",
+                  ifelse(Season == "Transition", "Pamurimi",
+                  Season))),
+         n.months = ifelse(Season == "Ihirimi", 3,
+                    ifelse(Season == "Okorimi", 5,
+                    ifelse(Season == "Pamurimi", 4,
+                    NA))),
+         month = ifelse(Month == "January",1,
+                 ifelse(Month == "February",2,
+                 ifelse(Month == "March",3,
+                 ifelse(Month == "April",4,
+                 ifelse(Month == "May",5,
+                 ifelse(Month == "June",6,
+                 ifelse(Month == "July",7,
+                 ifelse(Month == "August",8,
+                 ifelse(Month == "September",9,
+                 ifelse(Month == "October",10,
+                 ifelse(Month == "November",11,
+                 ifelse(Month == "December",12,
+                 Month))))))))))))) |>
+  rename(scientific_name = Scientific) |>
+  group_by(scientific_name, Season) |>
+  mutate(n.months.p = n(),
+         relative = (n.months.p/n.months)) |>
+  as.data.frame() |>
+  unique()
+
+pamiwa_presence$month <- as.numeric(pamiwa_presence$month)
+
+# lista de aves de Colombia
+aco_list <- read_csv("aco_list.csv")
+aco_list$scientific_name[which(aco_list$scientific_name == "Bubulcus ibis")] = "Ardea ibis"
+
+spp_levels <- pamiwa_presence |>
+  left_join(aco_list) |>
+  arrange(id) |>
+  dplyr::select(id,order,family, genus, scientific_name) |>
+  unique() |> as.data.frame()
+
+# Relative abundance per season for all species
+Fig2 <- pamiwa_presence |> 
+  ggplot(aes(y = factor(scientific_name,
+                        levels = rev(spp_levels$scientific_name)), 
+             x = factor(month, 
+                                   levels = c(8:12,1:7)),
+             color = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")),
+             fill = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")))) +
+    geom_tile(alpha = 0.9) +
+    labs(x = "Month",
+         y = "Species",
+         fill = "Season",
+         color = "Season") +
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+    annotate(geom = "text", 
+             label = c("ãcabo",
+                       "hureko",
+                       "mimiwa-mimiyo",
+                       "yai",
+                       "miyavi",
+                       paste0("v","i","\u0336","v","i","\u0336","ve"),
+                       "piyube",
+                       paste0("k","i","\u0336","pebeko"),
+                       "yao mi",
+                       "chuchuvako",
+                       "kabo ˜koeko",
+                       "wari",
+                       "horomimiyo",
+                       "vichami"), 
+             y = c(255, 
+                   240,
+                   220,
+                   200,
+                   180,
+                   160,
+                   140,
+                   120,
+                   100,
+                   80,
+                   60,
+                   40,
+                   20,
+                   5), 
+             fontface = "italic",
+             angle = 90, vjust = -0.8, x = 13, size = 2)+
+    theme_bw()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"), 
+          legend.box.spacing = unit(0, "pt"),
+          axis.ticks = element_blank(),
+          axis.text.y = element_text(face = "italic", 
+                                     hjust = 1, size = 3.25))
+
+ggsave(filename = "Figure2_heatmap.png",
+       plot = Fig2, units = "mm", 
+       width = 110, height = 250, dpi = 600)
+
+  # 6.6 x 11 inches
+```
+
+
+## Six species with stronguest change of abundance among the seasons - seis especies con cambios de abundancia
+
+```{r}
+ab_pamiwa_df <- pamiwa_presence |>
+  filter(scientific_name %in% c("Trogon viridis",
+                                "Bucco macrodactylus",
+                                "Brotogeris cyanoptera",
+                                "Neoctantes niger",
+                                "Tyrannus savana",
+                                "Sporophila angolensis")) |>
+  dplyr::select(scientific_name, Season, relative)
+
+ab_pamiwa <- ab_pamiwa_df |>
+  ggplot(aes(y = factor(scientific_name,
+                        levels = rev(spp_levels$scientific_name)), 
+             fill = relative,
+             color = relative,
+             x = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")))) +
+    geom_tile(alpha = 0.85) +
+   labs(x = "Season",
+         y = "Species",
+        tag = "(a)",
+         fill = "Relative seasonal presence",
+         color = "Relative seasonal presence") +
+    scale_fill_gradient(high = "#d7191c",
+                        low ="#2c7bb6",
+                        limits = c(0.2,0.8),
+                        breaks = c(0.25,0.5,0.75))+
+    scale_color_gradient(high = "#d7191c",
+                         low ="#2c7bb6",
+                        limits = c(0.2,0.8),
+                        breaks = c(0.25,0.5,0.75))+
+    scale_x_discrete(expand = c(0,0),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+        annotate(geom = "text", 
+             label = c(" õrokõ",
+                       paste0(" harab","i","\u0336",
+                              " koreovaimu ñemini kodeiboak","i","\u0336"),
+                       paste0(" õpõk","u","\u0336","y","u","\u0336","r","u","\u0336"),
+                       paste0(" mi takaka ñemik","i","\u0336"),
+                       " kuito aû yarabe",
+                       " veami mihikiñemini kavekiaki"), 
+             y = c(5.5,4.5,3.5,2.5,1.5,0.5), 
+             fontface = "italic",
+             hjust = 0,vjust = -1, x = 0.5, size = 3)+
+  theme_classic()+
+    theme(legend.position = "bottom",
+          legend.box.spacing = unit(0,"pt"),
+          axis.ticks = element_blank(),
+          axis.text.y = element_text(face = "italic", 
+                                     hjust = 1),
+          axis.text.x = element_text(face = "italic"))
+ab_pamiwa
+
+daily_relabu <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(checklist_id) |>
+  filter(!any(observation_count == "NA")) |>
+  mutate(RelAbun = observation_count/Total_ind) |> 
+  filter(scientific_name %in% c("Trogon viridis",
+                                "Bucco macrodactylus",
+                                "Brotogeris cyanoptera",
+                                "Neoctantes niger",
+                                "Tyrannus savana",
+                                "Sporophila angolensis")) |>
+  group_by(scientific_name, year, month, day_of_year, Season) |> 
+  summarise(RelAb = mean(RelAbun)) |> 
+  group_by(scientific_name, year, month, Season) |> 
+  summarise(RelAb = max(RelAb)) |>
+  left_join(ab_pamiwa_df) |> 
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = RelAb,
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")),
+             fill = relative))+
+    facet_wrap(~factor(scientific_name,
+                        levels = c("Trogon viridis",
+                                "Bucco macrodactylus",
+                                "Brotogeris cyanoptera",
+                                "Neoctantes niger",
+                                "Tyrannus savana",
+                                "Sporophila angolensis")), 
+               scales = "free_y")+
+    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
+    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
+    scale_fill_gradient(high = "#d7191c",
+                        low ="#2c7bb6",
+                        limits = c(0.2,0.8),
+                        breaks = c(0.25,0.5,0.75),
+                        na.value = "white")+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  labs(x = "Month",
+       y = "Monthly relative abundance",
+       fill = "",
+       color = "Season",
+       tag = "(b)")+
+    theme_classic()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"),
+          strip.text = element_text(face = "italic"),
+          axis.text.x = element_text(angle = 55, hjust = 1)) +
+  guides(fill = "none")
+daily_relabu
+
+cowplot::plot_grid(ab_pamiwa, 
+                   daily_relabu,
+             ncol = 1)
+
+ggsave(filename = "Fig5_abundance.png", dpi = 600,
+       units = "mm", width = 173, height = 160)
+
+```
+
+
+# Environmental variables
+
+We download  Giovanni - NASA data (MERRA-2)
+
+```{r}
+precipitation <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2T1NXFLX_5_12_4_PRECTOTCORR.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) |> 
+  mutate(day_ts = date(time)) |>
+  group_by(day_ts) |>
+  summarise(cumm_prec = sum(mean_M2T1NXFLX_5_12_4_PRECTOTCORR))
+
+t_mini <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMIN.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
+
+t_mean <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMEAN.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
+
+t_maxi <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMAX.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
+
+temperature <- t_mini |>
+  left_join(t_mean) |>
+  left_join(t_maxi) 
+
+colnames(temperature) <- c("day_ts", "mini_temp", "mean_temp", "maxi_temp")
+```
+
+
+And we can assign the Season from the Indigenous people
+
+```{r}
+
+temp_week <- temperature |>
+  mutate(week = week(day_ts),
+         year = year(day_ts),
+         Season = ifelse(week %in% c(33:48),"Pamurimi",
+                  ifelse(week %in% c(49:53,1:10),"Ihirimi",
+                  ifelse(week %in% c(11:32),"Okorimi",
+                  "other"))),
+         year_week = floor_date(day_ts, "week"),
+#         year_week = day_ts # remove this to see by week... 
+         ) |> 
+  group_by(year_week, Season) |> 
+  summarise(mini_temp_week = mean(mini_temp),
+            mean_temp_week = mean(mean_temp),
+            maxi_temp_week = mean(maxi_temp)) |>
+  ungroup()
+
+Gtem <- gam(maxi_temp_week ~ s(as.numeric(year_week), k = -1) + Season, data = temp_week)
+gam.check(Gtem)
+
+env_fig_a <- temp_week |>
+  ggplot(aes(x = year_week, 
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")), 
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")))) +
+#    geom_point(aes(y = maxi_temp_week, color = Season, fill = Season),
+#               alpha = 0.02, shape = 2) +
+    geom_point(aes(y = mean_temp_week),
+               alpha = 0.075, shape = 21) +
+#    geom_point(aes(y = mini_temp_week, color = Season, fill = Season),
+#               alpha = 0.02, shape = 6) +
+  geom_smooth(aes(y = maxi_temp_week), method = "gam", formula = y~s(x,k = 9),
+              linetype = "dashed", fullrange = TRUE)+
+  geom_smooth(aes(y = mean_temp_week),  method = "gam", formula = y~s(x,k = 9),
+              fullrange = TRUE)+
+  geom_smooth(aes(y = mini_temp_week), method = "gam", formula = y~s(x,k = 9),
+              linetype = "dashed", fullrange = TRUE)+
+  scale_x_date(expand = c(0,0))+
+  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  labs(x = "Date",
+       y = "Weekly temperature (ºC) \n (min - mean - max)",
+       tag = "(a)",
+       fill = "Season",
+       color = "Season")+
+    theme_classic() +
+  theme(legend.position = "none",
+          legend.text = element_text(face = "italic"))
+env_fig_a
+
+```
+
+
+```{r}
+
+preci_week <- precipitation |>
+  mutate(week = week(day_ts),
+         Season = ifelse(week %in% c(33:48),"Pamurimi",
+                  ifelse(week %in% c(49:53,1:10),"Ihirimi",
+                  ifelse(week %in% c(11:32),"Okorimi",
+                  "other"))),
+         year_week = floor_date(day_ts, "week"),
+#         year_week = day_ts # remove this to see by week... 
+         ) |> 
+  group_by(year_week, Season) |> 
+  summarise(mini_prec_week = min(cumm_prec),
+            mean_prec_week = mean(cumm_prec),
+            maxi_prec_week = max(cumm_prec),
+            weekly_cumm_prec = sum(cumm_prec)) |>
+  ungroup()
+
+Gprec <- gam(weekly_cumm_prec ~ s(as.numeric(year_week), k = -1)+Season, data = preci_week)
+gam.check(Gprec)
+
+env_fig_b <- preci_week |>
+  ggplot(aes(x = year_week, 
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")), 
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")))) +
+    geom_point(aes(y = weekly_cumm_prec),
+               alpha = 0.075, shape = 21) +
+#  geom_smooth(aes(y = maxi_prec_week),
+#              linetype = "dashed", fullrange = TRUE)+
+  geom_smooth(aes(y = weekly_cumm_prec), method = "gam", formula = y~s(x,k = 9),
+              fullrange = TRUE)+
+#  geom_smooth(aes(y = mini_prec_week),
+#              linetype = "dashed", fullrange = TRUE)+
+  scale_x_date(expand = c(0,0))+
+  scale_y_continuous(limits = c(0,200))+
+  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "\u0336","i",
+                                                    "m",
+                                                    "\u0336","i",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("\u0336","I",
+                                                   "h",
+                                                   "\u0336","i",
+                                                   "r",
+                                                   "\u0336","i",
+                                                   "m",
+                                                    "\u0336","i",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "\u0336","i",
+                                                   "m",
+                                                    "\u0336","i",
+                                                    "\n (wet)")))+
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "\u0336","i",
+                                                    "m",
+                                                    "\u0336","i",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("\u0336","I",
+                                                   "h",
+                                                   "\u0336","i",
+                                                   "r",
+                                                   "\u0336","i",
+                                                   "m",
+                                                    "\u0336","i",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "\u0336","i",
+                                                   "m",
+                                                    "\u0336","i",
+                                                    "\n (wet)")))+
+  labs(x = "Date",
+       y = "Weekly cummulative precipitation (mm)",
+       tag = "(b)",
+       fill = "Season",
+       color = "Season")+
+    theme_classic() +
+  theme(legend.position = "none",
+          legend.text = element_text(face = "italic"))
+env_fig_b
+
+```
+
+And combine
+```{r}
+ggpubr::ggarrange(env_fig_a, 
+                   env_fig_b,
+             ncol = 2, common.legend = TRUE, legend = "bottom")
+
+ggsave(filename = "Fig6_Environmental.png", dpi = 600,
+       units = "in", width = 6.6, height = 5)
+
+
+```
+
+
+# eBird users with best quality contribution
+
+```{r}
+ebd_eff |>
+   filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |> 
+  group_by(observer_id, checklist_id) |> 
+  count() |> 
+  group_by(observer_id) |> 
+  count() |> 
+  arrange(-n) |>
+  head(10)
+
+```
+
+obsr2774010: Etno-ornitologia Amazonian Motmot (groupal account)
+obsr337022: Orlando Acevedo-Charry (Western researcher at the University of Florida - US, Florida, Gainesville)
+obsr286988: Scott Robinson (Western researcher at the University of Florida - US, Florida, Gainesville)
+obsr669221,obsr540781: Guillermo Saborío Vega & Jorge Gabriel Campos (Bird Guide - Costa Rica, Arenal)
+obsr433512: José Castaño (Bird Guide - Colombia, Antioquia, Medellín)
+obsr156275: Glenn Seeholzer (Western researcher at the Cornell Lab - US, New York, Ithaca)
+obsr269273: Iván Lau (Bird Guide - Colombia, Antioquia, Medellín)
+obsr538843: Juan López (Bird Guide - Colombia, Antioquia, Medellín)
+obsr429816,obsr1474737: Ana C. Rojas & Magui Rojas (not public profile)
+obsr769303: Elvis Felipe Quintero Quintero (Bird Guide - Colombia, Meta, Restrepo)
