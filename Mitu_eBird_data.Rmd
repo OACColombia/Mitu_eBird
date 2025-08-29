@@ -313,7 +313,8 @@ ebd_eff <- ebd_count |>
                              (is.na(observation_count)), 
                             "To improve",
                            "other"
-                           ))))))
+                           )))))) |>
+  filter(checklist_id != "S49975087") # only a captive individual
 ```
 
 
@@ -670,8 +671,8 @@ SppRich_a <- ebd_eff |>
   theme(legend.text = element_text(face = "italic"),
         axis.ticks = element_blank(),
         legend.position = "bottom",
-        axis.title.x = element_blank())
-SppRich_a
+        axis.title.x = element_blank()) 
+SppRich_a 
 
 SppRich_b <- ggplot(Cohens_d_montly, 
                     aes(x = factor(month, 
@@ -780,12 +781,82 @@ spp_levels <- pamiwa_presence |>
   dplyr::select(id,order,family, genus, scientific_name) |>
   unique() |> as.data.frame()
 
+# Bring back eBird data
+pamiwa_eBird_presence <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |> 
+  group_by(scientific_name, Season, month) |>
+  count() |>
+  bind_rows(.id = "dataset", pamiwa_presence) |> 
+  mutate(dataset = case_when(dataset == 1~"eBird",
+                             dataset != 1~"Pamiwa"))
+
+# Labeller facet_grid
+labe_month <- c(
+  '8' = "Aug",
+  '9' = "Sep",
+  '10' = "Oct", 
+  '11' = "Nov",
+  '12' = "Dec",
+  '1' = "Jan",
+  '2' = "Feb",
+  '3' = "Mar",
+  '4' = "Apr",
+  '5' = "May",
+  '6' = "Jun",
+  '7' = "Jul"
+  )
+
+# Indigenous names
+dat_text <- data.frame(
+  label = c("ãcabo",
+            "hureko",
+            "mimiwa-mimiyo",
+            "yai",
+            "miyavi",
+            paste0("v","i","\u0336","v","i","\u0336","ve"),
+            "piyube",
+            paste0("k","i","\u0336","pebeko"),
+            "yao mi",
+            "chuchuvako",
+            "kabo ˜koeko",
+            "wari",
+            "horomimiyo",
+            "vichami"),
+  dataset = c(NA,"Pamiwa"),
+  month = rep("Jul",14),
+  x = rep(3,14),
+  y = c(255,
+        240,
+        220,
+        200,
+        180,
+        160,
+        140,
+        120,
+        100,
+        80,
+        60,
+        40,
+        20,
+        5)
+)
+
+
 # Relative abundance per season for all species
-Fig2 <- pamiwa_presence |> 
+Fig2 <- pamiwa_eBird_presence |> 
+  filter(scientific_name %in% spp_levels$scientific_name) |>
   ggplot(aes(y = factor(scientific_name,
                         levels = rev(spp_levels$scientific_name)), 
-             x = factor(month, 
-                                   levels = c(8:12,1:7)),
+             x = factor(dataset,
+                        levels = c("Pamiwa", 
+                                   "eBird")),
              color = factor(Season,
                         levels = c("Pamurimi",
                                    "Ihirimi",
@@ -794,8 +865,11 @@ Fig2 <- pamiwa_presence |>
                         levels = c("Pamurimi",
                                    "Ihirimi",
                                    "Okorimi")))) +
+    facet_grid(~factor(month,
+                       levels = c(8:12,1:7)),
+               switch = "x", labeller = as_labeller(labe_month))+
     geom_tile(alpha = 0.9) +
-    labs(x = "Month",
+    labs(x = "",
          y = "Species",
          fill = "Season",
          color = "Season") +
@@ -837,54 +911,244 @@ Fig2 <- pamiwa_presence |>
                                                    "m",
                                                     "i","\u0336",
                                                     "\n (wet)"))) +
-    scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
-                              "Dec", "Jan", "Feb", 
-                              "Mar", "Apr", "May", "Jun", "Jul"))+
-    annotate(geom = "text", 
-             label = c("ãcabo",
-                       "hureko",
-                       "mimiwa-mimiyo",
-                       "yai",
-                       "miyavi",
-                       paste0("v","i","\u0336","v","i","\u0336","ve"),
-                       "piyube",
-                       paste0("k","i","\u0336","pebeko"),
-                       "yao mi",
-                       "chuchuvako",
-                       "kabo ˜koeko",
-                       "wari",
-                       "horomimiyo",
-                       "vichami"), 
-             y = c(255, 
-                   240,
-                   220,
-                   200,
-                   180,
-                   160,
-                   140,
-                   120,
-                   100,
-                   80,
-                   60,
-                   40,
-                   20,
-                   5), 
-             fontface = "italic",
-             angle = 90, vjust = -0.8, x = 13, size = 2)+
+    scale_x_discrete(labels = c("Pamiwã", "eBird"),
+                     position = "top") +
     theme_bw()+
     theme(legend.position = "bottom",
           legend.text = element_text(face = "italic"), 
           legend.box.spacing = unit(0, "pt"),
+          strip.background = element_blank(),
           axis.ticks = element_blank(),
           axis.text.y = element_text(face = "italic", 
-                                     hjust = 1, size = 3.25))
-
+                                     hjust = 1, size = 3.25),
+          axis.text.x = element_text(angle = 65, hjust = 0.1, vjust = -1))
+Fig2
 ggsave(filename = "Figure2_heatmap.png",
        plot = Fig2, units = "mm", 
-       width = 110, height = 250, dpi = 600)
+       width = 220, height = 250, dpi = 600)
 
   # 6.6 x 11 inches
 ```
+
+## Seasonal relative abundance variation
+
+```{r}
+ab_pamiwa_df <- pamiwa_presence |>
+  filter(scientific_name %in% c("Ortalis guttata",
+                                "Thraupis episcopus",
+                                "Ramphastos tucanus",
+                                "Crotophaga major")) |>
+  dplyr::select(scientific_name, Season, relative)
+
+Fig_relabu_a <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(checklist_id) |>
+  filter(!any(observation_count == "NA")) |>
+  mutate(RelAbun = observation_count/Total_ind) |> 
+  filter(scientific_name %in% c("Ortalis guttata",
+                                "Thraupis episcopus",
+                                "Ramphastos tucanus",
+                                "Crotophaga major")) |>
+  group_by(scientific_name, year, month, day_of_year, Season) |> 
+  summarise(RelAb = max(RelAbun)) |> 
+  group_by(scientific_name, year, month, Season) |> 
+  summarise(RelAb = max(RelAb)) |>
+  left_join(ab_pamiwa_df) |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = RelAb,
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")),
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi"))))+
+    facet_wrap(~factor(scientific_name,
+                        levels = c("Ortalis guttata",
+                                "Thraupis episcopus",
+                                "Ramphastos tucanus",
+                                "Crotophaga major")), 
+               scales = "free_y")+
+    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
+    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  labs(x = "Month",
+       y = "Monthly relative abundance",
+       fill = "",
+       color = "Season",
+       tag = "(a)")+
+    theme_classic()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"),
+          strip.text = element_text(face = "italic"),
+          axis.text.x = element_text(angle = 55, hjust = 1)) +
+  guides(fill = "none")
+Fig_relabu_a
+
+```
+
+
+```{r}
+ab_pamiwa_df2 <- pamiwa_presence |>
+  filter(scientific_name %in% c("Tinamus major",
+                                "Tinamus guttatus",
+                                "Nothocrax urumutum",
+                                "Mitu tomentosum",
+                                "Penelope jacquacu",
+                                "Psophia crepitans")) |>
+  dplyr::select(scientific_name, Season, relative)
+
+Fig_relabu_b <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse"), 
+         checklist_id != "S49975087") |> # it was a captive individual
+  group_by(checklist_id) |>
+  filter(!any(observation_count == "NA")) |>
+  mutate(RelAbun = observation_count/Total_ind) |> 
+  filter(scientific_name %in% c("Tinamus major",
+                                "Tinamus guttatus",
+                                "Nothocrax urumutum",
+                                "Mitu tomentosum",
+                                "Penelope jacquacu",
+                                "Psophia crepitans")) |> 
+  group_by(scientific_name, year, month, day_of_year, Season) |> 
+  summarise(RelAb = mean(RelAbun)) |> 
+  group_by(scientific_name, year, month, Season) |> 
+  summarise(RelAb = max(RelAb)) |>
+  left_join(ab_pamiwa_df2) |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = RelAb,
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")),
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi"))))+
+    facet_wrap(~factor(scientific_name,
+                        levels = c("Tinamus major",
+                                "Tinamus guttatus",
+                                "Nothocrax urumutum",
+                                "Mitu tomentosum",
+                                "Penelope jacquacu",
+                                "Psophia crepitans")), 
+               scales = "free_y")+
+    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
+    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  labs(x = "Month",
+       y = "Monthly relative abundance",
+       fill = "",
+       color = "Season",
+       tag = "(b)")+
+    theme_classic()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"),
+          strip.text = element_text(face = "italic"),
+          axis.text.x = element_text(angle = 55, hjust = 1)) +
+  guides(fill = "none")
+
+Fig_relabu_b
+```
+
+
 
 
 ## Six species with stronguest change of abundance among the seasons - seis especies con cambios de abundancia
@@ -1289,17 +1553,19 @@ ebd_eff |>
   group_by(observer_id) |> 
   count() |> 
   arrange(-n) |>
-  head(10)
+  head(12)
 
 ```
 
-obsr2774010: Etno-ornitologia Amazonian Motmot (groupal account)
-obsr337022: Orlando Acevedo-Charry (Western researcher at the University of Florida - US, Florida, Gainesville)
-obsr286988: Scott Robinson (Western researcher at the University of Florida - US, Florida, Gainesville)
-obsr669221,obsr540781: Guillermo Saborío Vega & Jorge Gabriel Campos (Bird Guide - Costa Rica, Arenal)
-obsr433512: José Castaño (Bird Guide - Colombia, Antioquia, Medellín)
-obsr156275: Glenn Seeholzer (Western researcher at the Cornell Lab - US, New York, Ithaca)
-obsr269273: Iván Lau (Bird Guide - Colombia, Antioquia, Medellín)
-obsr538843: Juan López (Bird Guide - Colombia, Antioquia, Medellín)
-obsr429816,obsr1474737: Ana C. Rojas & Magui Rojas (not public profile)
-obsr769303: Elvis Felipe Quintero Quintero (Bird Guide - Colombia, Meta, Restrepo)
+1. obsr2774010: Etno-ornitologia Amazonian Motmot (groupal account).
+2. obsr337022: Orlando Acevedo-Charry (Western researcher at the University of Florida - US, Florida, Gainesville).
+3. obsr286988: Scott Robinson (Western researcher at the University of Florida - US, Florida, Gainesville).
+4. obsr669221,obsr540781: Guillermo Saborío Vega & Jorge Gabriel Campos (Bird Guide - Costa Rica, Arenal).
+5. obsr433512: José Castaño (Bird Guide - Colombia, Antioquia, Medellín).
+6. obsr156275: Glenn Seeholzer (Western researcher at the Cornell Lab - US, New York, Ithaca).
+7. obsr269273: Iván Lau (Bird Guide - Colombia, Antioquia, Medellín).
+8. obsr538843: Juan López (Bird Guide - Colombia, Antioquia, Medellín).
+9. obsr429816,obsr1474737: Ana C. Rojas & Magui Rojas (not public profile).
+10. obsr769303: Elvis Felipe Quintero Quintero (Bird Guide - Colombia, Meta, Restrepo).
+11. obsr95918: Miguel A Acevedo (Western researcher at the University of Florida - US, Florida, Gainesville).
+12. obsr649861 or obsr3877752: Joint account of John and Mary Clark (Avitoursts - UK, Rhydyclafdy) or group account of adventurescolombia (Tourist operators).
