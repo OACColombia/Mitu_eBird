@@ -99,7 +99,7 @@ colsE <- c("observer_id", "sampling_event_identifier",
            "common_name", "scientific_name",
            "observation_count",
            "state_code", "locality_id", "latitude", "longitude",
-           "protocol_name", "all_species_reported",
+           "protocol_type","protocol_name", "all_species_reported",
            "observation_date",
            "time_observations_started",
            "duration_minutes", "effort_distance_km",
@@ -792,10 +792,28 @@ pamiwa_eBird_presence <- ebd_eff |>
                          "Fine",
                          "Coarse")) |> 
   group_by(scientific_name, Season, month) |>
-  count() |>
+  count() |> 
+  mutate(n.months = ifelse(Season == "Ihirimi", 3,
+                    ifelse(Season == "Okorimi", 5,
+                    ifelse(Season == "Pamurimi", 4,
+                    NA)))) |> 
+  group_by(scientific_name, Season) |>
+  mutate(n.months.p = n(),
+         relative = (n.months.p/n.months)) |>
+  as.data.frame() |>
   bind_rows(.id = "dataset", pamiwa_presence) |> 
   mutate(dataset = case_when(dataset == 1~"eBird",
                              dataset != 1~"Pamiwa"))
+
+# see the relative presence of six species
+pamiwa_eBird_presence |>
+  filter(scientific_name %in% c("Trogon viridis",
+                                "Bucco macrodactylus",
+                                "Brotogeris cyanoptera",
+                                "Neoctantes niger",
+                                "Tyrannus savana",
+                                "Sporophila angolensis"))
+
 
 # Labeller facet_grid
 labe_month <- c(
@@ -940,6 +958,30 @@ ab_pamiwa_df <- pamiwa_presence |>
                                 "Crotophaga major")) |>
   dplyr::select(scientific_name, Season, relative)
 
+arrow_df <- data.frame(
+      x = 8, xend = 8, y = 0.45, yend = 0.35,
+      scientific_name = "Thraupis episcopus", # Ties the arrow to facet "Thraupis episcopus"
+      Season = "Okorimi"
+    )
+
+arrow_df_Cm <- data.frame(
+      x = 10, xend = 10, y = 0.55, yend = 0.45,
+      scientific_name = "Crotophaga major", # Ties the arrow to facet "Thraupis episcopus"
+      Season = "Okorimi"
+    )
+
+arrow_df_Og <- data.frame(
+      x = 5, xend = 5, y = 0.45, yend = 0.35,
+      scientific_name = "Ortalis guttata", # Ties the arrow to facet "Thraupis episcopus"
+      Season = "Ihirimi"
+    )
+arrow_df_Rt <- data.frame(
+      x = 8, xend = 8, y = 0.55, yend = 0.45,
+      scientific_name = "Ramphastos tucanus", # Ties the arrow to facet "Thraupis episcopus"
+      Season = "Okorimi"
+    )
+
+
 Fig_relabu_a <- ebd_eff |>
   ungroup() |>
   mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
@@ -980,6 +1022,34 @@ Fig_relabu_a <- ebd_eff |>
                scales = "free_y")+
     geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
     geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
+  geom_segment(
+        data = arrow_df,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 1 # Customize arrow thickness
+      )+
+   geom_segment(
+        data = arrow_df_Cm,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 1 # Customize arrow thickness
+      )+
+     geom_segment(
+        data = arrow_df_Og,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "red", # Customize arrow color
+        linewidth = 1 # Customize arrow thickness
+      )+
+     geom_segment(
+        data = arrow_df_Rt,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "red", # Customize arrow color
+        linewidth = 1 # Customize arrow thickness
+      )+
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
                               "Dec", "Jan", "Feb", 
                               "Mar", "Apr", "May", "Jun", "Jul"))+
@@ -1024,8 +1094,7 @@ Fig_relabu_a <- ebd_eff |>
   labs(x = "Month",
        y = "Monthly relative abundance",
        fill = "",
-       color = "Season",
-       tag = "(a)")+
+       color = "Season")+
     theme_classic()+
     theme(legend.position = "bottom",
           legend.text = element_text(face = "italic"),
@@ -1034,15 +1103,29 @@ Fig_relabu_a <- ebd_eff |>
   guides(fill = "none")
 Fig_relabu_a
 
+ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
+       units = "mm", width = 173, height = 100)
+
 ```
 
+
+
+
+GAM for the historical abundance variation?
 
 ```{r}
 ab_pamiwa_df2 <- pamiwa_presence |>
   filter(scientific_name %in% c("Tinamus major",
                                 "Tinamus guttatus",
+                                "Crypturellus casiquiare",
+                                "Crypturellus cinereus",
+                                "Crypturellus duidae", 
+                                "Crypturellus soui",
+                                "Crypturellus undulatus",
+                                "Crypturellus variegatus",
                                 "Nothocrax urumutum",
                                 "Mitu tomentosum",
+                                "Crax alector",
                                 "Penelope jacquacu",
                                 "Psophia crepitans")) |>
   dplyr::select(scientific_name, Season, relative)
@@ -1062,18 +1145,87 @@ Fig_relabu_b <- ebd_eff |>
   mutate(RelAbun = observation_count/Total_ind) |> 
   filter(scientific_name %in% c("Tinamus major",
                                 "Tinamus guttatus",
+                                "Crypturellus casiquiare",
+                                "Crypturellus cinereus",
+                                "Crypturellus duidae", 
+                                "Crypturellus soui",
+                                "Crypturellus undulatus",
+                                "Crypturellus variegatus",
                                 "Nothocrax urumutum",
                                 "Mitu tomentosum",
+                                "Crax alector",
                                 "Penelope jacquacu",
                                 "Psophia crepitans")) |> 
-  group_by(scientific_name, year, month, day_of_year, Season) |> 
-  summarise(RelAb = mean(RelAbun)) |> 
-  group_by(scientific_name, year, month, Season) |> 
-  summarise(RelAb = max(RelAb)) |>
+  group_by(scientific_name, month) |>
+  mutate(Count = max(observation_count)) |>
+  mutate(Date = floor_date(observation_date, "month")) |>
+  dplyr::select(Date, scientific_name, Count) |>
+  group_by(scientific_name, Date) |>
+  summarise(Count = round(max(Count),0)) |>
+  group_by(scientific_name) |>
+  as.data.frame() |>
+  ggplot(aes(x = Date,
+             y = Count))+
+    facet_wrap(~factor(scientific_name,
+                        levels = c("Tinamus major",
+                                "Tinamus guttatus",
+                                "Crypturellus casiquiare",
+                                "Crypturellus cinereus",
+                                "Crypturellus duidae", 
+                                "Crypturellus soui",
+                                "Crypturellus undulatus",
+                                "Crypturellus variegatus",
+                                "Nothocrax urumutum",
+                                "Mitu tomentosum",
+                                "Crax alector",
+                                "Penelope jacquacu",
+                                "Psophia crepitans")), 
+               scales = "free_y")+
+  geom_point(alpha = 0.4)+
+  labs(x = "Observation date",
+       y = "Monthly max count",
+       tag = "(b)")+
+#  geom_smooth(se = TRUE, method = "lm")+
+    theme_classic()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"),
+          strip.text = element_text(face = "italic"),
+          axis.text.x = element_text(angle = 55, hjust = 1))
+
+Fig_relabu_b
+```
+
+
+```{r Previous approach eval=FALSE}
+Fig_relabu_b <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse"), 
+         checklist_id != "S49975087") |> # it was a captive individual
+  group_by(checklist_id) |>
+  filter(!any(observation_count == "NA")) |>
+  mutate(RelAbun = observation_count/Total_ind) |> 
+  filter(scientific_name %in% c("Tinamus major",
+                                "Tinamus guttatus",
+                                "Crypturellus casiquiare",
+                                "Crypturellus cinereus",
+                                "Crypturellus duidae", 
+                                "Crypturellus soui",
+                                "Crypturellus undulatus",
+                                "Crypturellus variegatus",
+                                "Nothocrax urumutum",
+                                "Mitu tomentosum",
+                                "Crax alector",
+                                "Penelope jacquacu",
+                                "Psophia crepitans")) |> 
   left_join(ab_pamiwa_df2) |>
-  ggplot(aes(x = factor(month,
-                        levels = c(8:12,1:7)),
-             y = RelAb,
+  ggplot(aes(x = observation_date,
+             y = RelAbun,
              color = factor(Season,
                            levels = c("Pamurimi",
                                       "Ihirimi",
@@ -1085,16 +1237,19 @@ Fig_relabu_b <- ebd_eff |>
     facet_wrap(~factor(scientific_name,
                         levels = c("Tinamus major",
                                 "Tinamus guttatus",
+                                "Crypturellus casiquiare",
+                                "Crypturellus cinereus",
+                                "Crypturellus duidae", 
+                                "Crypturellus soui",
+                                "Crypturellus undulatus",
+                                "Crypturellus variegatus",
                                 "Nothocrax urumutum",
                                 "Mitu tomentosum",
+                                "Crax alector",
                                 "Penelope jacquacu",
                                 "Psophia crepitans")), 
                scales = "free_y")+
-    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
-    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
-  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
-                              "Dec", "Jan", "Feb", 
-                              "Mar", "Apr", "May", "Jun", "Jul"))+
+  geom_point(alpha = 0.6)+
     scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
                                   labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
@@ -1133,22 +1288,20 @@ Fig_relabu_b <- ebd_eff |>
                                                    "m",
                                                     "i","\u0336",
                                                     "\n (wet)")))+
-  labs(x = "Month",
-       y = "Monthly relative abundance",
-       fill = "",
+  labs(x = "Observation date",
+       y = "Relative abundance",
+       fill = "Season",
        color = "Season",
        tag = "(b)")+
+  geom_smooth(se = FALSE)+
     theme_classic()+
     theme(legend.position = "bottom",
           legend.text = element_text(face = "italic"),
           strip.text = element_text(face = "italic"),
-          axis.text.x = element_text(angle = 55, hjust = 1)) +
-  guides(fill = "none")
+          axis.text.x = element_text(angle = 55, hjust = 1))
 
 Fig_relabu_b
 ```
-
-
 
 
 ## Six species with stronguest change of abundance among the seasons - seis especies con cambios de abundancia
