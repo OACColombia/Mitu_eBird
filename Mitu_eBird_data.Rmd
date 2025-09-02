@@ -959,29 +959,152 @@ ab_pamiwa_df <- pamiwa_presence |>
   dplyr::select(scientific_name, Season, relative)
 
 arrow_df <- data.frame(
-      x = 8, xend = 8, y = 0.45, yend = 0.35,
+      x = c(3,8), xend = c(5,10), y = c(0.04,0.06), yend = c(0.06,0.09),
       scientific_name = "Thraupis episcopus", # Ties the arrow to facet "Thraupis episcopus"
       Season = "Okorimi"
     )
 
 arrow_df_Cm <- data.frame(
-      x = 10, xend = 10, y = 0.55, yend = 0.45,
+      x = 10, xend = 10, y = 0.24, yend = 0.19,
       scientific_name = "Crotophaga major", # Ties the arrow to facet "Thraupis episcopus"
       Season = "Okorimi"
     )
 
 arrow_df_Og <- data.frame(
-      x = 5, xend = 5, y = 0.45, yend = 0.35,
+      x = c(5,5), xend = c(1,10), y = c(0.06,0.06), yend = c(0.09,0.06),
       scientific_name = "Ortalis guttata", # Ties the arrow to facet "Thraupis episcopus"
       Season = "Ihirimi"
     )
 arrow_df_Rt <- data.frame(
-      x = 8, xend = 8, y = 0.55, yend = 0.45,
+      x = c(8,8), xend = c(5,10), y = c(0.04,0.04), yend = c(0.05,0.055),
       scientific_name = "Ramphastos tucanus", # Ties the arrow to facet "Thraupis episcopus"
       Season = "Okorimi"
     )
 
+Fig_relabu_a <- ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(checklist_id) |>
+  filter(!any(observation_count == "NA")) |>
+  mutate(RelAbun = observation_count/Total_ind) |> 
+  filter(scientific_name %in% c("Ortalis guttata",
+                                "Thraupis episcopus",
+                                "Ramphastos tucanus",
+                                "Crotophaga major")) |>
+  group_by(scientific_name, year, month, Season) |> 
+  summarise(RelAb = mean(RelAbun)) |>
+  left_join(ab_pamiwa_df) |>
+  group_by(scientific_name, Season, month) |> 
+  summarise(RelAb = mean(RelAb)) |>
+  as.data.frame() |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = RelAb,
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")))) +
+      facet_wrap(~factor(scientific_name,
+                        levels = c("Ortalis guttata",
+                                "Thraupis episcopus",
+                                "Ramphastos tucanus",
+                                "Crotophaga major")), 
+               scales = "free_y")+
+  geom_col() +
+  geom_segment(
+        data = arrow_df,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 0.5 # Customize arrow thickness
+      )+
+   geom_segment(
+        data = arrow_df_Cm,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 0.5 # Customize arrow thickness
+      )+
+     geom_segment(
+        data = arrow_df_Og,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 0.5 # Customize arrow thickness
+      )+
+     geom_segment(
+        data = arrow_df_Rt,
+        aes(x = x, y = y, xend = xend, yend = yend),
+        arrow = arrow(length = unit(0.3, "cm")),
+        color = "black", # Customize arrow color
+        linewidth = 0.5 # Customize arrow thickness
+      )+
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                                  labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)")))+
+  labs(x = "Month",
+       y = "Mean monthly relative abundance",
+       fill = "",
+       color = "Season")+
+    theme_classic()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"),
+          strip.text = element_text(face = "italic"),
+          axis.text.x = element_text(angle = 55, hjust = 1)) 
 
+Fig_relabu_a
+
+ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
+       units = "mm", width = 173, height = 120)
+
+```
+
+
+```{r eval = FALSE}
 Fig_relabu_a <- ebd_eff |>
   ungroup() |>
   mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
@@ -1101,15 +1224,7 @@ Fig_relabu_a <- ebd_eff |>
           strip.text = element_text(face = "italic"),
           axis.text.x = element_text(angle = 55, hjust = 1)) +
   guides(fill = "none")
-Fig_relabu_a
-
-ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
-       units = "mm", width = 173, height = 100)
-
 ```
-
-
-
 
 GAM for the historical abundance variation?
 
