@@ -486,6 +486,7 @@ aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Tangara nigrocinta")] = 
 aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Tersina veridis")] = "Tersina viridis"
 aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Todirostrum chysocrotaphum")] = "Todirostrum chrysocrotaphum"
 aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Veniliornis affinis")] = "Dryobates affinis"
+aves_pamiwa$Scientific[which(aves_pamiwa$Scientific == "Xenops minutus")] = "Xenops genibarbis"
 ```
 
 riqueza de especies por season
@@ -607,22 +608,26 @@ SppRich_a <- ebd_eff |>
                                  "Ihirimi",
                                  "Okorimi"))))+
 #  geom_violin(alpha = 0.1) +
-    geom_boxplot(alpha = 0.1, outlier.shape = "x", outlier.color = "gray") +
-    geom_jitter(alpha = 0.1, width = 0.1)+
-#    geom_pointrange(data = Cohens_d_montly,
-#                    aes(y = meanSpp,
-#                        ymin = meanSpp - (sdSpp),
-#                        ymax = meanSpp + (sdSpp)),
-#             position = position_nudge(0.2)) +
-    geom_point(data = Cohens_d_montly,
+    geom_boxplot(alpha = 0.3, outlier.shape = "x", outlier.color = "gray",
+                 position = position_nudge(0.2), width = 0.4) +
+ #   geom_jitter(alpha = 0.2, width = 0.1)+
+    geom_col(data = Cohens_d_montly,
                     aes(y = muSpp_i,
                       color = factor(Season,
                                    levels = c("Pamurimi",
                                               "Ihirimi",
                                               "Okorimi"))),
-               position = position_nudge(-0.2),
-               size = 4,
-              shape = 8) +
+             width = 0.4, alpha = 0.3,
+             position = position_nudge(-0.2)) +
+#    geom_point(data = Cohens_d_montly,
+#                    aes(y = muSpp_i,
+#                      color = factor(Season,
+#                                   levels = c("Pamurimi",
+#                                              "Ihirimi",
+#                                              "Okorimi"))),
+#               position = position_nudge(-0.2),
+#               size = 4,
+#              shape = 8) +
   labs(x = "Month",
        color = "Season",
        fill = "Season",
@@ -734,7 +739,7 @@ cowplot::plot_grid(SppRich_a, SppRich_b,
              ncol = 1)
 
 ggsave(filename = "Fig4_speciesRichness.png", dpi = 600,
-       units = "mm", width = 130, height = 130)
+       units = "mm", width = 150, height = 130)
 
 ```
 
@@ -954,38 +959,78 @@ ggsave(filename = "Figure2_heatmap.png",
 
 ## Seasonal relative abundance variation
 
+### Frutos de pupuña
+Basado en Vaupés - entre plumas, sonidos y colores de 2018:
+
+\item Thraupis episcopus - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo)
+\item Thraupis palmarum - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo, julio)
+
+\item Cissopis leverianus - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (septiembre,octubre, marzo)
+\item Ramphocelus carbo - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (agosto, octubre, diciembre, marzo)
+
+
+### Inicio de época seca
+Basado en Vaupés - entre plumas, sonidos y colores de 2016:
+
+\item Monasa morphoeus - Llega época seca para iniciar quema y siembra. (diciembre, febrero, abril)
+
+### Inicio de época de lluvias
+Basado en Vaupés - entre plumas, sonidos y colores de 2018:
+
+\item Crotophaga major - Kubay les grito; “aunque se escondan en lo más alto del cielo, con la primera lluvia de invierno caerán a la laguna y sufrirán lo que ellos han tenido que aguantar”...  El Ñuiko es un ave que solo aparece en la subienda de los ríos con las primeras lluvias de invierno y desaparece en las épocas de verano, dicen los abuelos que todavía están escondiéndose de Kubay. (marzo)
+
+### Migraciones
+Basado en Vaupés - entre plumas, sonidos y colores de 2018:
+
+\item Mycteria americana - "...nosotros tenemos que ir a realizar un trabajo comunitario de mantenimiento y construcción de la maloka donde vive nuestra abuela. Cada año en temporada de inicio de invierno todos la visitamos para dejarle la maloka en buen estado para que la abuela este tranquila y no se moje en el invierno...""...y por eso cada año saben que muchas especies de aves que pasan por bandadas en lo alto de los cielos, van de visita donde la abuela, viajan a un sola dirección y ordenadamente muy relucientes con sus plumones nuevos y cuando regresan, ya no tienen los plumones por que con estos tejieron la maloka de la abuela. Cada año se ven estas migraciones de aves en nuestra región, a comienzo del invierno." (noviembre, marzo)
+
+Adicional:
+
+\item Tyrannus savana: es señal de migración de jaguares de yurupari (octubre, marzo, junio)
+
 ```{r}
 ab_pamiwa_df <- pamiwa_presence |>
-  filter(scientific_name %in% c("Ortalis guttata",
+  filter(scientific_name %in% c("Monasa morphoeus",
+                                "Crotophaga major",
                                 "Thraupis episcopus",
-                                "Ramphastos tucanus",
-                                "Crotophaga major")) |>
-  dplyr::select(scientific_name, Season, relative)
+                                "Thraupis palmarum",
+                                "Cissopis leverianus",
+                                "Ramphocelus carbo",
+                                "Mycteria americana",
+                                "Tyrannus savana")) |>
+  dplyr::select(scientific_name, 
+                #Month, 
+                Season)
 
-arrow_df <- data.frame(
-      x = c(3,3,8), xend = c(1,5,10), y = c(0.05,0.04, 0.065), yend = c(0.05,0.04,0.065),
-      scientific_name = "Thraupis episcopus", # Ties the arrow to facet "Thraupis episcopus"
-      Season = "Okorimi"
-    )
-
-arrow_df_Cm <- data.frame(
-      x = 10, xend = 10, y = 0.24, yend = 0.19,
-      scientific_name = "Crotophaga major", # Ties the arrow to facet "Thraupis episcopus"
-      Season = "Okorimi"
-    )
-
-arrow_df_Og <- data.frame(
-      x = c(5,5), xend = c(1,10), y = c(0.07,0.06), yend = c(0.07,0.06),
-      scientific_name = "Ortalis guttata",
-      Season = "Ihirimi"
-    )
-arrow_df_Rt <- data.frame(
-      x = c(8,8,8,8), xend = c(10,9,3,5), 
-      y = c(0.05,0.045,0.04,0.035), 
-      yend = c(0.05,0.045,0.04,0.035),
-      scientific_name = "Ramphastos tucanus", # Ties the arrow to facet "Thraupis episcopus"
-      Season = "Okorimi"
-    )
+point_df <- data.frame(
+  scientific_name = c("Monasa morphoeus","Monasa morphoeus","Monasa morphoeus",
+                      "Crotophaga major",
+                      "Thraupis episcopus","Thraupis episcopus","Thraupis episcopus","Thraupis episcopus",
+                      "Thraupis palmarum","Thraupis palmarum","Thraupis palmarum","Thraupis palmarum","Thraupis palmarum",
+                      "Cissopis leverianus","Cissopis leverianus","Cissopis leverianus",
+                      "Ramphocelus carbo","Ramphocelus carbo","Ramphocelus carbo","Ramphocelus carbo",
+                      "Mycteria americana","Mycteria americana",
+                      "Tyrannus savana","Tyrannus savana","Tyrannus savana"),
+  month = c(5,7,9,
+            8,
+            1,3,5,8,
+            1,3,5,8,12,
+            2,3,8,
+            1,3,5,8,
+            4,8,
+            3,8,11
+            ),
+  Season = c("Ihirimi","Ihirimi","Okorimi",
+            "Okorimi",
+            "Pamurimi","Pamurimi","Ihirimi","Okorimi",
+            "Pamurimi","Pamurimi","Ihirimi","Okorimi","Okorimi",
+            "Pamurimi","Pamurimi","Okorimi",
+            "Pamurimi","Pamurimi","Ihirimi","Okorimi",
+            "Pamurimi","Okorimi",
+           "Pamurimi","Okorimi","Okorimi"
+            ),
+  RelAb = rep(-0.003,25)
+)
 
 Fig_relabu_a <- ebd_eff |>
   ungroup() |>
@@ -999,10 +1044,16 @@ Fig_relabu_a <- ebd_eff |>
   group_by(checklist_id) |>
   filter(!any(observation_count == "NA")) |>
   mutate(RelAbun = observation_count/Total_ind) |> 
-  filter(scientific_name %in% c("Ortalis guttata",
-                                "Thraupis episcopus",
-                                "Ramphastos tucanus",
-                                "Crotophaga major")) |>
+  filter(scientific_name %in% c("Thraupis episcopus",
+                                "Thraupis palmarum",
+                                "Cissopis leverianus",
+                                "Ramphocelus carbo",
+                                
+                                "Monasa morphoeus",
+                                "Crotophaga major",
+                            
+                                "Mycteria americana",
+                                "Tyrannus savana")) |>
   group_by(scientific_name, year, month, Season) |> 
   summarise(RelAb = mean(RelAbun)) |>
   left_join(ab_pamiwa_df) |>
@@ -1017,43 +1068,24 @@ Fig_relabu_a <- ebd_eff |>
                                       "Ihirimi",
                                       "Okorimi")))) +
       facet_wrap(~factor(scientific_name,
-                        levels = c("Crotophaga major",
-                                   "Ortalis guttata",
-                                   "Thraupis episcopus",
-                                   "Ramphastos tucanus"
+                        levels = c("Thraupis episcopus",
+                                "Thraupis palmarum",
+                                "Cissopis leverianus",
+                                "Ramphocelus carbo",
+                                
+                                "Monasa morphoeus",
+                                "Crotophaga major",
+                            
+                                "Mycteria americana",
+                                "Tyrannus savana"
                                 )), 
-               scales = "free_y")+
+               scales = "free_y", ncol = 4)+
   geom_col() +
-  geom_segment(
-        data = arrow_df,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
+  geom_text(
+        data = point_df,
+        aes(x = month, y = RelAb),
         color = "black", # Customize arrow color
-        linewidth = 1.5, # Customize arrow thickness
-        alpha = 0.7
-      )+
- #  geom_segment(
-#        data = arrow_df_Cm,
-#        aes(x = x, y = y, xend = xend, yend = yend),
-#        arrow = arrow(length = unit(0.3, "cm")),
-#        color = "black", # Customize arrow color
-#        linewidth = 0.5 # Customize arrow thickness
-#      )+
-     geom_segment(
-        data = arrow_df_Og,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "black", # Customize arrow color
-        linewidth = 1.5, # Customize arrow thickness
-        alpha = 0.7
-      )+
-     geom_segment(
-        data = arrow_df_Rt,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "black", # Customize arrow color
-        linewidth = 1.5, # Customize arrow thickness
-        alpha = 0.7
+        label = "IEK", size = 2
       )+
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
                               "Dec", "Jan", "Feb", 
@@ -1101,7 +1133,7 @@ Fig_relabu_a <- ebd_eff |>
        fill = "Season",
        color = "Season")+
     theme_classic()+
-    theme(legend.position = "right",
+    theme(legend.position = "bottom",
           legend.text = element_text(face = "italic"),
           strip.text = element_text(face = "italic"),
           axis.text.x = element_text(angle = 55, hjust = 1)) 
@@ -1109,7 +1141,7 @@ Fig_relabu_a <- ebd_eff |>
 Fig_relabu_a
 
 ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
-       units = "mm", width = 173, height = 100)
+       units = "mm", width = 225, height = 100)
 
 ```
 
@@ -1238,7 +1270,7 @@ Fig_relabu_a <- ebd_eff |>
 
 GAM for the historical abundance variation?
 
-```{r}
+```{r eval=FALSE}
 ab_pamiwa_df2 <- pamiwa_presence |>
   filter(scientific_name %in% c("Tinamus major",
                                 "Tinamus guttatus",
@@ -1431,7 +1463,7 @@ Fig_relabu_b
 
 ## Six species with stronguest change of abundance among the seasons - seis especies con cambios de abundancia
 
-```{r}
+```{r eval = FALSE}
 ab_pamiwa_df <- pamiwa_presence |>
   filter(scientific_name %in% c("Trogon viridis",
                                 "Bucco macrodactylus",
@@ -1598,7 +1630,7 @@ ggsave(filename = "Fig5_abundance.png", dpi = 600,
 
 We download  Giovanni - NASA data (MERRA-2)
 
-```{r}
+```{r eval = FALSE}
 precipitation <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2T1NXFLX_5_12_4_PRECTOTCORR.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) |> 
   mutate(day_ts = date(time)) |>
   group_by(day_ts) |>
@@ -1620,7 +1652,7 @@ colnames(temperature) <- c("day_ts", "mini_temp", "mean_temp", "maxi_temp")
 
 And we can assign the Season from the Indigenous people
 
-```{r}
+```{r eval = FALSE}
 
 temp_week <- temperature |>
   mutate(week = week(day_ts),
@@ -1715,7 +1747,7 @@ env_fig_a
 ```
 
 
-```{r}
+```{r eval = FALSE}
 
 preci_week <- precipitation |>
   mutate(week = week(day_ts),
@@ -1807,7 +1839,7 @@ env_fig_b
 ```
 
 And combine
-```{r}
+```{r eval = FALSE}
 ggpubr::ggarrange(env_fig_a, 
                    env_fig_b,
              ncol = 2, common.legend = TRUE, legend = "bottom")
@@ -1821,7 +1853,7 @@ ggsave(filename = "Fig6_Environmental.png", dpi = 600,
 
 # eBird users with best quality contribution
 
-```{r}
+```{r eval = TRUE}
 ebd_eff |>
    filter(category %in% c("Ultrafine",
                          "Fine",
