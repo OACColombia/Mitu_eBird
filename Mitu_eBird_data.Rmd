@@ -1029,7 +1029,7 @@ point_df <- data.frame(
             "Pamurimi","Okorimi",
            "Pamurimi","Okorimi","Okorimi"
             ),
-  RelAb = rep(-0.003,25)
+  RelAb = rep(0,25)
 )
 
 Fig_relabu_a <- ebd_eff |>
@@ -1054,15 +1054,19 @@ Fig_relabu_a <- ebd_eff |>
                             
                                 "Mycteria americana",
                                 "Tyrannus savana")) |>
-  group_by(scientific_name, year, month, Season) |> 
-  summarise(RelAb = mean(RelAbun)) |>
-  left_join(ab_pamiwa_df) |>
-  group_by(scientific_name, Season, month) |> 
-  summarise(RelAb = mean(RelAb)) |>
+  group_by(scientific_name, year, month,week, Season) |> 
+  mutate(MaxRelAbun = max(RelAbun)) |> 
+  group_by(scientific_name, month, Season) |>
+summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
+            RelAb.median = round(quantile(MaxRelAbun, probs = 0.5), 3),
+            RelAb.upper = round(quantile(MaxRelAbun, probs = 0.75), 3)) |>
   as.data.frame() |>
   ggplot(aes(x = factor(month,
                         levels = c(8:12,1:7)),
-             y = RelAb,
+             color = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")),
              fill = factor(Season,
                            levels = c("Pamurimi",
                                       "Ihirimi",
@@ -1080,12 +1084,16 @@ Fig_relabu_a <- ebd_eff |>
                                 "Tyrannus savana"
                                 )), 
                scales = "free_y", ncol = 4)+
-  geom_col() +
+ # geom_boxplot(aes(y = RelAbun), alpha = 0.4) +
+   geom_col(aes(y = RelAb.median), alpha = 0.6) +
+  geom_errorbar(aes(ymin = RelAb.lower, 
+                    ymax = RelAb.upper),
+                width = 0.2)+
   geom_text(
         data = point_df,
         aes(x = month, y = RelAb),
         color = "black", # Customize arrow color
-        label = "IEK", size = 2
+        label = "P", size = 2, vjust = 1, fontface = "bold"
       )+
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
                               "Dec", "Jan", "Feb", 
@@ -1129,7 +1137,7 @@ Fig_relabu_a <- ebd_eff |>
                                                     "i","\u0336",
                                                     "\n (wet)")))+
   labs(x = "Month",
-       y = "Mean monthly relative abundance",
+       y = "Monthly relative abundance",
        fill = "Season",
        color = "Season")+
     theme_classic()+
@@ -1141,7 +1149,7 @@ Fig_relabu_a <- ebd_eff |>
 Fig_relabu_a
 
 ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
-       units = "mm", width = 225, height = 100)
+       units = "mm", width = 225, height = 125)
 
 ```
 
