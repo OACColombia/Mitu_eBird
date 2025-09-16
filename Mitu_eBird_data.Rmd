@@ -608,7 +608,7 @@ SppRich_a <- ebd_eff |>
                                  "Ihirimi",
                                  "Okorimi"))))+
 #  geom_violin(alpha = 0.1) +
-    geom_boxplot(alpha = 0.3, outlier.shape = "x", outlier.color = "gray",
+    geom_boxplot(alpha = 0.3, outlier.shape = "x",
                  position = position_nudge(0.2), width = 0.4) +
  #   geom_jitter(alpha = 0.2, width = 0.1)+
     geom_col(data = Cohens_d_montly,
@@ -619,26 +619,25 @@ SppRich_a <- ebd_eff |>
                                               "Okorimi"))),
              width = 0.4, alpha = 0.3,
              position = position_nudge(-0.2)) +
-#    geom_point(data = Cohens_d_montly,
-#                    aes(y = muSpp_i,
-#                      color = factor(Season,
-#                                   levels = c("Pamurimi",
-#                                              "Ihirimi",
-#                                              "Okorimi"))),
-#               position = position_nudge(-0.2),
-#               size = 4,
-#              shape = 8) +
+    geom_text(data = Cohens_d_montly,
+                    aes(y = muSpp_i,
+                      color = factor(Season,
+                                   levels = c("Pamurimi",
+                                              "Ihirimi",
+                                              "Okorimi")),
+                      label = muSpp_i),
+               vjust = -0.5, size = 3,
+             position = position_nudge(-0.2), show.legend = FALSE) +
   labs(x = "Month",
        color = "Season",
        fill = "Season",
-       y = "Montly species richness",
-       tag = "(a)") +
+       y = "Montly species richness") +
   scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
                                                     "i","\u0336",
-                                                    "\n (transition)"),
+                                                    " (transition)"),
                                 "Ihirimi" = paste0("I","\u0336",
                                                    "h",
                                                    "i","\u0336",
@@ -646,18 +645,18 @@ SppRich_a <- ebd_eff |>
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (dry)"),
+                                                    " (dry)"),
                                 "Okorimi" = paste0("Okor",
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (wet)"))) +
+                                                    " (wet)"))) +
   scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
                                                     "i","\u0336",
-                                                    "\n (transition)"),
+                                                    " (transition)"),
                                 "Ihirimi" = paste0("I","\u0336",
                                                    "h",
                                                    "i","\u0336",
@@ -665,12 +664,12 @@ SppRich_a <- ebd_eff |>
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (dry)"),
+                                                    " (dry)"),
                                 "Okorimi" = paste0("Okor",
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (wet)")))+
+                                                    " (wet)")))+
   scale_y_continuous(expand = c(0,0), 
                      limits = c(0,380))+
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
@@ -683,6 +682,12 @@ SppRich_a <- ebd_eff |>
         axis.title.x = element_blank()) 
 SppRich_a 
 
+ggsave(filename = "Fig4_speciesRichness.png", plot = SppRich_a, dpi = 600,
+       units = "mm", width = 168, height = 79)
+```
+
+Previous attempt:
+```{r eval=FALSE}
 SppRich_b <- ggplot(Cohens_d_montly, 
                     aes(x = factor(month, 
                                    levels = c(8:12,1:7)),
@@ -1032,7 +1037,8 @@ point_df <- data.frame(
   RelAb = rep(0,25)
 )
 
-Fig_relabu_a <- ebd_eff |>
+# summarize relative abundance
+summary_ebd <- ebd_eff |>
   ungroup() |>
   mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
                   ifelse(month %in% c(12,1:2),"Ihirimi",
@@ -1060,7 +1066,18 @@ Fig_relabu_a <- ebd_eff |>
 summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
             RelAb.median = round(quantile(MaxRelAbun, probs = 0.5), 3),
             RelAb.upper = round(quantile(MaxRelAbun, probs = 0.75), 3)) |>
-  as.data.frame() |>
+  as.data.frame()
+
+# force Mycteria americana to have values NA
+dummy_row <- data.frame(
+  scientific_name = c("Mycteria americana","Mycteria americana"),
+  month = c(1,2), 
+  Season = c("Pamurimi","Pamurimi"),
+  RelAb.median = c(0,1)
+)
+
+
+Fig_relabu_a <- summary_ebd |>
   ggplot(aes(x = factor(month,
                         levels = c(8:12,1:7)),
              color = factor(Season,
@@ -1089,6 +1106,9 @@ summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
   geom_errorbar(aes(ymin = RelAb.lower, 
                     ymax = RelAb.upper),
                 width = 0.2)+
+  geom_blank(data = dummy_row,
+             aes(x = factor(month),
+                 y = RelAb.median)) +
   geom_text(
         data = point_df,
         aes(x = month, y = RelAb),
@@ -1103,7 +1123,7 @@ summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
                                                     "i","\u0336",
                                                     "m",
                                                     "i","\u0336",
-                                                    "\n (transition)"),
+                                                    " (transition)"),
                                 "Ihirimi" = paste0("I","\u0336",
                                                    "h",
                                                    "i","\u0336",
@@ -1111,18 +1131,18 @@ summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (dry)"),
+                                                    " (dry)"),
                                 "Okorimi" = paste0("Okor",
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (wet)")))+
+                                                    " (wet)")))+
   scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
                                   labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
                                                     "i","\u0336",
-                                                    "\n (transition)"),
+                                                    " (transition)"),
                                 "Ihirimi" = paste0("I","\u0336",
                                                    "h",
                                                    "i","\u0336",
@@ -1130,12 +1150,12 @@ summarise(RelAb.lower = round(quantile(MaxRelAbun, probs = 0.25),3),
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (dry)"),
+                                                    " (dry)"),
                                 "Okorimi" = paste0("Okor",
                                                    "i","\u0336",
                                                    "m",
                                                     "i","\u0336",
-                                                    "\n (wet)")))+
+                                                    " (wet)")))+
   labs(x = "Month",
        y = "Monthly relative abundance",
        fill = "Season",
