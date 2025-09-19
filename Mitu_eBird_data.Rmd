@@ -322,12 +322,84 @@ saveRDS(ebd_eff, "temporal/ebd_eff.RDS")
 
 # Distribution of the records - distribución de los registros
 
-Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
-
-
+Sampling effort
 ```{r}
 ebd_eff <- readRDS("temporal/ebd_eff.RDS")
 
+ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(month, Season) |>
+  count() |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = n,
+             color = factor(Season,
+                            levels = c("Pamurimi",
+                                       "Ihirimi",
+                                       "Okorimi")),
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")))) +
+#  facet_grid(~year) +
+  geom_bar(stat = "identity") +
+  labs(x = "Months",
+       y = "Cummulative number of records",
+         fill = "Season",
+         color = "Season") +
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+```
+
+Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
+
+```{r}
 ebd_sankey <- ebd_eff |>
   mutate(All = "eBird data",
          `Type of list` = case_when(all_species_reported == FALSE ~ "Incomplete",
