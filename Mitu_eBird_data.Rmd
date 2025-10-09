@@ -35,8 +35,6 @@ library(maps);
 library(gridExtra); 
 #Sankey plot with ggplot
 library(ggsankey) #should be installed via `devtools::install_github("davidsjoberg/ggsankey")`
-# GAM models - Modelos generalizados aditivos
-library(mgcv)
 
 ```
 
@@ -82,7 +80,7 @@ The downloaded data include all the Vaupes department, we can see the entire dep
 
 Los datos descargados incluyen todo el Vaupés, posemos ver el departamento entero y usar filtros para compara los datos.
 
-```{r}
+```{r eval=FALSE}
 #Datos descargados eBird - a Diciembre 2024
 Vaupes_ebd <- "ebd_CO-VAU_smp_relApr-2025/ebd_CO-VAU_smp_relApr-2025.txt"
 Vaupes_sed <- "ebd_CO-VAU_smp_relApr-2025/ebd_CO-VAU_smp_relApr-2025_sampling.txt"
@@ -118,12 +116,24 @@ ebd_filt <- auk_ebd(file = Vaupes_ebd,           #archivo de registros
              f_sed,
              overwrite=T,
              keep = colsE)
+```
 
+```{r eval=FALSE}
+f_ebd <- "temporal/ebd_Mitu.txt"                         #Data to be saved
+f_sed <- "temporal/sed_Mitu.txt"                         #Sampling event to be saved
 
 #and with read_ebd I apply another filter to do not repeate records from groups
 sed_only <- read_sampling(f_sed)
 ebd_only <- read_ebd(f_ebd)
 
+saveRDS(sed_only, "temporal/sed_only.rds")
+saveRDS(ebd_only, "temporal/ebd_only.rds")
+```
+
+```{r}
+sed_only <- readRDS("temporal/sed_only.rds")
+ebd_only <- readRDS("temporal/ebd_only.rds")
+  
 #linea de tiempo
 ggplot(ebd_only, aes(x = year(observation_date), fill = protocol_name))+
   geom_bar()+
@@ -166,7 +176,7 @@ ggplot()+
   labs(title = "eBird Sampling effort in Vaupés, Colombia")+
   theme_bw() 
 
-write_csv(sed_only, "sampling_points_mitu.csv")
+#write_csv(sed_only, "sampling_points_mitu.csv")
 
 ```
 
@@ -277,7 +287,7 @@ Podemos plantear diferentes niveles de resolución de esfuerzo, el primer paso p
 
 5. "Incomplete" son las listas correctamente identificadas como incompletas, las cuales al momento de analizar, por lo general, se filtran, pues no hay certeza de algunos aspectos del muestreo.
 
-```{r}
+```{r eval=FALSE}
 
 ebd_eff <- ebd_count |>
   mutate(category = ifelse((all_species_reported == "TRUE") &
@@ -399,7 +409,7 @@ ebd_eff |>
 
 Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
 
-```{r}
+```{r eval=FALSE}
 ebd_sankey <- ebd_eff |>
   mutate(All = "eBird data",
          `Type of list` = case_when(all_species_reported == FALSE ~ "Incomplete",
@@ -528,6 +538,8 @@ ggsave(filename = "Fig4_SankeyPlot.png", dpi = 600,
 
 ```
 
+![Sankey Plot](Fig4_SankeyPlot.png)
+
 Aquí se ve que la mayor cantidad de datos de eBird desde Vaupés pueden mejorar (56.3%). Si se usa una resolución gruesa de muestreo, solo un poco mas del 30% de los datos es utilizable. Para preguntas que requieren detallada información espacio temporal hay muy pocos registros (resolución fina 6%, resolución ultra fina 0.1%). 
 
 # Species richness of birds in Pamiwã - Riqueza de especies de aves en Pamiwã
@@ -617,18 +629,7 @@ eBird_S_montly <- ebd_eff |>
 eBird_S_montly
 ```
 
-Y luego hacer el computo del Cohen's d
-
-$$
-d_{z_{i}}=\frac{\overline{x}_{i}-\mu_{i}}{s_{i}}*K_i
-$$
-
-where $K_i$ is a correction factor for small sample sizes of Cohen's $d_z$
-
-$$
-K_i = \frac{n_i - 3}{n_i - 2.25}*\sqrt{\frac{n_i-2}{n_i}}
-$$
-
+Summarize
 ```{r}
 Cohens_d_montly <- eBird_S_montly |>
   ungroup() |>
@@ -756,68 +757,6 @@ SppRich_a
 
 ggsave(filename = "Fig4_speciesRichness.png", plot = SppRich_a, dpi = 600,
        units = "mm", width = 168, height = 79)
-```
-
-Previous attempt:
-```{r eval=FALSE}
-SppRich_b <- ggplot(Cohens_d_montly, 
-                    aes(x = factor(month, 
-                                   levels = c(8:12,1:7)),
-                        color = factor(Season,
-                                       levels = c("Pamurimi",
-                                                  "Ihirimi",
-                                                  "Okorimi")), 
-                     y = d))+
-    geom_hline(yintercept = 0, linetype = "dashed",
-               color = "darkgray")+
-    geom_hline(yintercept = c(0.8,-0.8), linetype = "dotted",
-               color = "darkgray")+
-    geom_linerange(aes(ymin = CIlower95, 
-                       ymax = CIupper95),
-                   alpha = 0.75, linewidth = 1)+
-    geom_linerange(aes(ymin = CIlower80, 
-                       ymax = CIupper80),
-                   alpha = 0.75, linewidth = 2)+
-    geom_point(aes(size = factor(size_d)),
-               alpha = 0.95)+
-    labs(x = "Month",
-         color = "Season",
-         y = expression("Effect size (Cohen's"~italic(d[z])~")"),
-         tag = "(b)")+
-  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
-                              "Dec", "Jan", "Feb", 
-                              "Mar", "Apr", "May", "Jun", "Jul"))+
-  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                     labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)"))) +
-
-  theme_classic()+
-  theme(legend.text = element_text(face = "italic"), 
-        legend.position = "none")
-SppRich_b
-
-cowplot::plot_grid(SppRich_a, SppRich_b,
-             ncol = 1)
-
-ggsave(filename = "Fig4_speciesRichness.png", dpi = 600,
-       units = "mm", width = 150, height = 130)
-
 ```
 
 
@@ -1026,15 +965,15 @@ Fig2 <- pamiwa_eBird_presence |>
           axis.text.y = element_text(face = "italic", 
                                      hjust = 1, size = 3.25),
           axis.text.x = element_text(angle = 65, hjust = 0.1, vjust = -1))
-Fig2
 ggsave(filename = "Figure2_heatmap.png",
        plot = Fig2, units = "mm", 
        width = 220, height = 250, dpi = 600)
 
   # 6.6 x 11 inches
 ```
+![Heatmap](Figure2_heatmap.png)
 
-## Seasonal relative abundance variation
+## Seasonal relative abundance variation - selection
 
 ### Frutos de pupuña
 Basado en Vaupés - entre plumas, sonidos y colores de 2018:
@@ -1064,6 +1003,8 @@ Basado en Vaupés - entre plumas, sonidos y colores de 2018:
 Adicional:
 
 \item Tyrannus savana: es señal de migración de jaguares de yurupari (octubre, marzo, junio)
+
+## Seasonal relative abundance variation - figure
 
 ```{r}
 ab_pamiwa_df <- pamiwa_presence |>
@@ -1244,712 +1185,6 @@ ggsave(filename = "Fig_RelAbunPamiwa.png", dpi = 600,
        units = "mm", width = 225, height = 125)
 
 ```
-
-
-```{r eval = FALSE}
-Fig_relabu_a <- ebd_eff |>
-  ungroup() |>
-  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
-                  ifelse(month %in% c(12,1:2),"Ihirimi",
-                  ifelse(month %in% c(3:7),"Okorimi",
-                  "other")))) |> 
-  filter(category %in% c("Ultrafine",
-                         "Fine",
-                         "Coarse")) |>
-  group_by(checklist_id) |>
-  filter(!any(observation_count == "NA")) |>
-  mutate(RelAbun = observation_count/Total_ind) |> 
-  filter(scientific_name %in% c("Ortalis guttata",
-                                "Thraupis episcopus",
-                                "Ramphastos tucanus",
-                                "Crotophaga major")) |>
-  group_by(scientific_name, year, month, day_of_year, Season) |> 
-  summarise(RelAb = max(RelAbun)) |> 
-  group_by(scientific_name, year, month, Season) |> 
-  summarise(RelAb = max(RelAb)) |>
-  left_join(ab_pamiwa_df) |>
-  ggplot(aes(x = factor(month,
-                        levels = c(8:12,1:7)),
-             y = RelAb,
-             color = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")),
-             fill = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi"))))+
-    facet_wrap(~factor(scientific_name,
-                        levels = c("Ortalis guttata",
-                                "Thraupis episcopus",
-                                "Ramphastos tucanus",
-                                "Crotophaga major")), 
-               scales = "free_y")+
-    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
-    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
-  geom_segment(
-        data = arrow_df,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "black", # Customize arrow color
-        linewidth = 1 # Customize arrow thickness
-      )+
-   geom_segment(
-        data = arrow_df_Cm,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "black", # Customize arrow color
-        linewidth = 1 # Customize arrow thickness
-      )+
-     geom_segment(
-        data = arrow_df_Og,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "red", # Customize arrow color
-        linewidth = 1 # Customize arrow thickness
-      )+
-     geom_segment(
-        data = arrow_df_Rt,
-        aes(x = x, y = y, xend = xend, yend = yend),
-        arrow = arrow(length = unit(0.3, "cm")),
-        color = "red", # Customize arrow color
-        linewidth = 1 # Customize arrow thickness
-      )+
-  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
-                              "Dec", "Jan", "Feb", 
-                              "Mar", "Apr", "May", "Jun", "Jul"))+
-    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  labs(x = "Month",
-       y = "Monthly relative abundance",
-       fill = "",
-       color = "Season")+
-    theme_classic()+
-    theme(legend.position = "bottom",
-          legend.text = element_text(face = "italic"),
-          strip.text = element_text(face = "italic"),
-          axis.text.x = element_text(angle = 55, hjust = 1)) +
-  guides(fill = "none")
-```
-
-GAM for the historical abundance variation?
-
-```{r eval=FALSE}
-ab_pamiwa_df2 <- pamiwa_presence |>
-  filter(scientific_name %in% c("Tinamus major",
-                                "Tinamus guttatus",
-                                "Crypturellus casiquiare",
-                                "Crypturellus cinereus",
-                                "Crypturellus duidae", 
-                                "Crypturellus soui",
-                                "Crypturellus undulatus",
-                                "Crypturellus variegatus",
-                                "Nothocrax urumutum",
-                                "Mitu tomentosum",
-                                "Crax alector",
-                                "Penelope jacquacu",
-                                "Psophia crepitans")) |>
-  dplyr::select(scientific_name, Season, relative)
-
-Fig_relabu_b <- ebd_eff |>
-  ungroup() |>
-  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
-                  ifelse(month %in% c(12,1:2),"Ihirimi",
-                  ifelse(month %in% c(3:7),"Okorimi",
-                  "other")))) |> 
-  filter(category %in% c("Ultrafine",
-                         "Fine",
-                         "Coarse"), 
-         checklist_id != "S49975087") |> # it was a captive individual
-  group_by(checklist_id) |>
-  filter(!any(observation_count == "NA")) |>
-  mutate(RelAbun = observation_count/Total_ind) |> 
-  filter(scientific_name %in% c("Tinamus major",
-                                "Tinamus guttatus",
-                                "Crypturellus casiquiare",
-                                "Crypturellus cinereus",
-                                "Crypturellus duidae", 
-                                "Crypturellus soui",
-                                "Crypturellus undulatus",
-                                "Crypturellus variegatus",
-                                "Nothocrax urumutum",
-                                "Mitu tomentosum",
-                                "Crax alector",
-                                "Penelope jacquacu",
-                                "Psophia crepitans")) |> 
-  group_by(scientific_name, month) |>
-  mutate(Count = max(observation_count)) |>
-  mutate(Date = floor_date(observation_date, "month")) |>
-  dplyr::select(Date, scientific_name, Count) |>
-  group_by(scientific_name, Date) |>
-  summarise(Count = round(max(Count),0)) |>
-  group_by(scientific_name) |>
-  as.data.frame() |>
-  ggplot(aes(x = Date,
-             y = Count))+
-    facet_wrap(~factor(scientific_name,
-                        levels = c("Tinamus major",
-                                "Tinamus guttatus",
-                                "Crypturellus casiquiare",
-                                "Crypturellus cinereus",
-                                "Crypturellus duidae", 
-                                "Crypturellus soui",
-                                "Crypturellus undulatus",
-                                "Crypturellus variegatus",
-                                "Nothocrax urumutum",
-                                "Mitu tomentosum",
-                                "Crax alector",
-                                "Penelope jacquacu",
-                                "Psophia crepitans")), 
-               scales = "free_y")+
-  geom_point(alpha = 0.4)+
-  labs(x = "Observation date",
-       y = "Monthly max count",
-       tag = "(b)")+
-#  geom_smooth(se = TRUE, method = "lm")+
-    theme_classic()+
-    theme(legend.position = "bottom",
-          legend.text = element_text(face = "italic"),
-          strip.text = element_text(face = "italic"),
-          axis.text.x = element_text(angle = 55, hjust = 1))
-
-Fig_relabu_b
-```
-
-
-```{r Previous approach eval=FALSE}
-Fig_relabu_b <- ebd_eff |>
-  ungroup() |>
-  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
-                  ifelse(month %in% c(12,1:2),"Ihirimi",
-                  ifelse(month %in% c(3:7),"Okorimi",
-                  "other")))) |> 
-  filter(category %in% c("Ultrafine",
-                         "Fine",
-                         "Coarse"), 
-         checklist_id != "S49975087") |> # it was a captive individual
-  group_by(checklist_id) |>
-  filter(!any(observation_count == "NA")) |>
-  mutate(RelAbun = observation_count/Total_ind) |> 
-  filter(scientific_name %in% c("Tinamus major",
-                                "Tinamus guttatus",
-                                "Crypturellus casiquiare",
-                                "Crypturellus cinereus",
-                                "Crypturellus duidae", 
-                                "Crypturellus soui",
-                                "Crypturellus undulatus",
-                                "Crypturellus variegatus",
-                                "Nothocrax urumutum",
-                                "Mitu tomentosum",
-                                "Crax alector",
-                                "Penelope jacquacu",
-                                "Psophia crepitans")) |> 
-  left_join(ab_pamiwa_df2) |>
-  ggplot(aes(x = observation_date,
-             y = RelAbun,
-             color = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")),
-             fill = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi"))))+
-    facet_wrap(~factor(scientific_name,
-                        levels = c("Tinamus major",
-                                "Tinamus guttatus",
-                                "Crypturellus casiquiare",
-                                "Crypturellus cinereus",
-                                "Crypturellus duidae", 
-                                "Crypturellus soui",
-                                "Crypturellus undulatus",
-                                "Crypturellus variegatus",
-                                "Nothocrax urumutum",
-                                "Mitu tomentosum",
-                                "Crax alector",
-                                "Penelope jacquacu",
-                                "Psophia crepitans")), 
-               scales = "free_y")+
-  geom_point(alpha = 0.6)+
-    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  labs(x = "Observation date",
-       y = "Relative abundance",
-       fill = "Season",
-       color = "Season",
-       tag = "(b)")+
-  geom_smooth(se = FALSE)+
-    theme_classic()+
-    theme(legend.position = "bottom",
-          legend.text = element_text(face = "italic"),
-          strip.text = element_text(face = "italic"),
-          axis.text.x = element_text(angle = 55, hjust = 1))
-
-Fig_relabu_b
-```
-
-
-## Six species with stronguest change of abundance among the seasons - seis especies con cambios de abundancia
-
-```{r eval = FALSE}
-ab_pamiwa_df <- pamiwa_presence |>
-  filter(scientific_name %in% c("Trogon viridis",
-                                "Bucco macrodactylus",
-                                "Brotogeris cyanoptera",
-                                "Neoctantes niger",
-                                "Tyrannus savana",
-                                "Sporophila angolensis")) |>
-  dplyr::select(scientific_name, Season, relative)
-
-ab_pamiwa <- ab_pamiwa_df |>
-  ggplot(aes(y = factor(scientific_name,
-                        levels = rev(spp_levels$scientific_name)), 
-             fill = relative,
-             color = relative,
-             x = factor(Season,
-                        levels = c("Pamurimi",
-                                   "Ihirimi",
-                                   "Okorimi")))) +
-    geom_tile(alpha = 0.85) +
-   labs(x = "Season",
-         y = "Species",
-        tag = "(a)",
-         fill = "Relative seasonal presence",
-         color = "Relative seasonal presence") +
-    scale_fill_gradient(high = "#d7191c",
-                        low ="#2c7bb6",
-                        limits = c(0.2,0.8),
-                        breaks = c(0.25,0.5,0.75))+
-    scale_color_gradient(high = "#d7191c",
-                         low ="#2c7bb6",
-                        limits = c(0.2,0.8),
-                        breaks = c(0.25,0.5,0.75))+
-    scale_x_discrete(expand = c(0,0),
-                     labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-        annotate(geom = "text", 
-             label = c(" õrokõ",
-                       paste0(" harab","i","\u0336",
-                              " koreovaimu ñemini kodeiboak","i","\u0336"),
-                       paste0(" õpõk","u","\u0336","y","u","\u0336","r","u","\u0336"),
-                       paste0(" mi takaka ñemik","i","\u0336"),
-                       " kuito aû yarabe",
-                       " veami mihikiñemini kavekiaki"), 
-             y = c(5.5,4.5,3.5,2.5,1.5,0.5), 
-             fontface = "italic",
-             hjust = 0,vjust = -1, x = 0.5, size = 3)+
-  theme_classic()+
-    theme(legend.position = "bottom",
-          legend.box.spacing = unit(0,"pt"),
-          axis.ticks = element_blank(),
-          axis.text.y = element_text(face = "italic", 
-                                     hjust = 1),
-          axis.text.x = element_text(face = "italic"))
-ab_pamiwa
-
-daily_relabu <- ebd_eff |>
-  ungroup() |>
-  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
-                  ifelse(month %in% c(12,1:2),"Ihirimi",
-                  ifelse(month %in% c(3:7),"Okorimi",
-                  "other")))) |> 
-  filter(category %in% c("Ultrafine",
-                         "Fine",
-                         "Coarse")) |>
-  group_by(checklist_id) |>
-  filter(!any(observation_count == "NA")) |>
-  mutate(RelAbun = observation_count/Total_ind) |> 
-  filter(scientific_name %in% c("Trogon viridis",
-                                "Bucco macrodactylus",
-                                "Brotogeris cyanoptera",
-                                "Neoctantes niger",
-                                "Tyrannus savana",
-                                "Sporophila angolensis")) |>
-  group_by(scientific_name, year, month, day_of_year, Season) |> 
-  summarise(RelAb = mean(RelAbun)) |> 
-  group_by(scientific_name, year, month, Season) |> 
-  summarise(RelAb = max(RelAb)) |>
-  left_join(ab_pamiwa_df) |> 
-  ggplot(aes(x = factor(month,
-                        levels = c(8:12,1:7)),
-             y = RelAb,
-             color = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")),
-             fill = relative))+
-    facet_wrap(~factor(scientific_name,
-                        levels = c("Trogon viridis",
-                                "Bucco macrodactylus",
-                                "Brotogeris cyanoptera",
-                                "Neoctantes niger",
-                                "Tyrannus savana",
-                                "Sporophila angolensis")), 
-               scales = "free_y")+
-    geom_boxplot(alpha = 0.75, outlier.shape = "x", outlier.color = "gray")+
-    geom_jitter(shape = 21,width = 0.15, alpha = 0.25)+
-    scale_fill_gradient(high = "#d7191c",
-                        low ="#2c7bb6",
-                        limits = c(0.2,0.8),
-                        breaks = c(0.25,0.5,0.75),
-                        na.value = "white")+
-  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
-                              "Dec", "Jan", "Feb", 
-                              "Mar", "Apr", "May", "Jun", "Jul"))+
-    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  labs(x = "Month",
-       y = "Monthly relative abundance",
-       fill = "",
-       color = "Season",
-       tag = "(b)")+
-    theme_classic()+
-    theme(legend.position = "bottom",
-          legend.text = element_text(face = "italic"),
-          strip.text = element_text(face = "italic"),
-          axis.text.x = element_text(angle = 55, hjust = 1)) +
-  guides(fill = "none")
-daily_relabu
-
-cowplot::plot_grid(ab_pamiwa, 
-                   daily_relabu,
-             ncol = 1)
-
-ggsave(filename = "Fig5_abundance.png", dpi = 600,
-       units = "mm", width = 173, height = 160)
-
-```
-
-
-# Environmental variables
-
-We download  Giovanni - NASA data (MERRA-2)
-
-```{r eval = FALSE}
-precipitation <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2T1NXFLX_5_12_4_PRECTOTCORR.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) |> 
-  mutate(day_ts = date(time)) |>
-  group_by(day_ts) |>
-  summarise(cumm_prec = sum(mean_M2T1NXFLX_5_12_4_PRECTOTCORR))
-
-t_mini <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMIN.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
-
-t_mean <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMEAN.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
-
-t_maxi <- read_csv("Giovanni/g4.areaAvgTimeSeries.M2SDNXSLV_5_12_4_T2MMAX.19800101-20250331.71W_0N_69W_1N.csv", skip = 7) 
-
-temperature <- t_mini |>
-  left_join(t_mean) |>
-  left_join(t_maxi) 
-
-colnames(temperature) <- c("day_ts", "mini_temp", "mean_temp", "maxi_temp")
-```
-
-
-And we can assign the Season from the Indigenous people
-
-```{r eval = FALSE}
-
-temp_week <- temperature |>
-  mutate(week = week(day_ts),
-         year = year(day_ts),
-         Season = ifelse(week %in% c(33:48),"Pamurimi",
-                  ifelse(week %in% c(49:53,1:10),"Ihirimi",
-                  ifelse(week %in% c(11:32),"Okorimi",
-                  "other"))),
-         year_week = floor_date(day_ts, "week"),
-#         year_week = day_ts # remove this to see by week... 
-         ) |> 
-  group_by(year_week, Season) |> 
-  summarise(mini_temp_week = mean(mini_temp),
-            mean_temp_week = mean(mean_temp),
-            maxi_temp_week = mean(maxi_temp)) |>
-  ungroup()
-
-Gtem <- gam(maxi_temp_week ~ s(as.numeric(year_week), k = -1) + Season, data = temp_week)
-gam.check(Gtem)
-
-env_fig_a <- temp_week |>
-  ggplot(aes(x = year_week, 
-             color = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")), 
-             fill = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")))) +
-#    geom_point(aes(y = maxi_temp_week, color = Season, fill = Season),
-#               alpha = 0.02, shape = 2) +
-    geom_point(aes(y = mean_temp_week),
-               alpha = 0.075, shape = 21) +
-#    geom_point(aes(y = mini_temp_week, color = Season, fill = Season),
-#               alpha = 0.02, shape = 6) +
-  geom_smooth(aes(y = maxi_temp_week), method = "gam", formula = y~s(x,k = 9),
-              linetype = "dashed", fullrange = TRUE)+
-  geom_smooth(aes(y = mean_temp_week),  method = "gam", formula = y~s(x,k = 9),
-              fullrange = TRUE)+
-  geom_smooth(aes(y = mini_temp_week), method = "gam", formula = y~s(x,k = 9),
-              linetype = "dashed", fullrange = TRUE)+
-  scale_x_date(expand = c(0,0))+
-  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "i","\u0336",
-                                                    "m",
-                                                    "i","\u0336",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("I","\u0336",
-                                                   "h",
-                                                   "i","\u0336",
-                                                   "r",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "i","\u0336",
-                                                   "m",
-                                                    "i","\u0336",
-                                                    "\n (wet)")))+
-  labs(x = "Date",
-       y = "Weekly temperature (ºC) \n (min - mean - max)",
-       tag = "(a)",
-       fill = "Season",
-       color = "Season")+
-    theme_classic() +
-  theme(legend.position = "none",
-          legend.text = element_text(face = "italic"))
-env_fig_a
-
-```
-
-
-```{r eval = FALSE}
-
-preci_week <- precipitation |>
-  mutate(week = week(day_ts),
-         Season = ifelse(week %in% c(33:48),"Pamurimi",
-                  ifelse(week %in% c(49:53,1:10),"Ihirimi",
-                  ifelse(week %in% c(11:32),"Okorimi",
-                  "other"))),
-         year_week = floor_date(day_ts, "week"),
-#         year_week = day_ts # remove this to see by week... 
-         ) |> 
-  group_by(year_week, Season) |> 
-  summarise(mini_prec_week = min(cumm_prec),
-            mean_prec_week = mean(cumm_prec),
-            maxi_prec_week = max(cumm_prec),
-            weekly_cumm_prec = sum(cumm_prec)) |>
-  ungroup()
-
-Gprec <- gam(weekly_cumm_prec ~ s(as.numeric(year_week), k = -1)+Season, data = preci_week)
-gam.check(Gprec)
-
-env_fig_b <- preci_week |>
-  ggplot(aes(x = year_week, 
-             color = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")), 
-             fill = factor(Season,
-                           levels = c("Pamurimi",
-                                      "Ihirimi",
-                                      "Okorimi")))) +
-    geom_point(aes(y = weekly_cumm_prec),
-               alpha = 0.075, shape = 21) +
-#  geom_smooth(aes(y = maxi_prec_week),
-#              linetype = "dashed", fullrange = TRUE)+
-  geom_smooth(aes(y = weekly_cumm_prec), method = "gam", formula = y~s(x,k = 9),
-              fullrange = TRUE)+
-#  geom_smooth(aes(y = mini_prec_week),
-#              linetype = "dashed", fullrange = TRUE)+
-  scale_x_date(expand = c(0,0))+
-  scale_y_continuous(limits = c(0,200))+
-  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "\u0336","i",
-                                                    "m",
-                                                    "\u0336","i",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("\u0336","I",
-                                                   "h",
-                                                   "\u0336","i",
-                                                   "r",
-                                                   "\u0336","i",
-                                                   "m",
-                                                    "\u0336","i",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "\u0336","i",
-                                                   "m",
-                                                    "\u0336","i",
-                                                    "\n (wet)")))+
-    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
-                                  labels = c("Pamurimi" = paste0("Pamur",
-                                                    "\u0336","i",
-                                                    "m",
-                                                    "\u0336","i",
-                                                    "\n (transition)"),
-                                "Ihirimi" = paste0("\u0336","I",
-                                                   "h",
-                                                   "\u0336","i",
-                                                   "r",
-                                                   "\u0336","i",
-                                                   "m",
-                                                    "\u0336","i",
-                                                    "\n (dry)"),
-                                "Okorimi" = paste0("Okor",
-                                                   "\u0336","i",
-                                                   "m",
-                                                    "\u0336","i",
-                                                    "\n (wet)")))+
-  labs(x = "Date",
-       y = "Weekly cummulative precipitation (mm)",
-       tag = "(b)",
-       fill = "Season",
-       color = "Season")+
-    theme_classic() +
-  theme(legend.position = "none",
-          legend.text = element_text(face = "italic"))
-env_fig_b
-
-```
-
-And combine
-```{r eval = FALSE}
-ggpubr::ggarrange(env_fig_a, 
-                   env_fig_b,
-             ncol = 2, common.legend = TRUE, legend = "bottom")
-
-ggsave(filename = "Fig6_Environmental.png", dpi = 600,
-       units = "in", width = 6.6, height = 5)
-
-
-```
-
 
 # eBird users with best quality contribution
 
