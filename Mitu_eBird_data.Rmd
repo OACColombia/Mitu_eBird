@@ -361,10 +361,10 @@ ebd_eff |>
 #  facet_grid(~year) +
   geom_bar(stat = "identity") +
   labs(x = "Months",
-       y = "Cummulative number of records",
+       y = "Cumulative number of records",
          fill = "Season",
          color = "Season") +
-    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+    scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -383,7 +383,7 @@ ebd_eff |>
                                                    "m",
                                                     "i","\u0336",
                                                     "\n (wet)"))) +
-    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+    scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -404,7 +404,6 @@ ebd_eff |>
                                                     "\n (wet)"))) +
   theme_bw() +
   theme(legend.position = "bottom")
-
 ```
 
 Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
@@ -705,7 +704,7 @@ SppRich_a <- ebd_eff |>
        color = "Season",
        fill = "Season",
        y = "Montly species richness") +
-  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+  scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -724,7 +723,7 @@ SppRich_a <- ebd_eff |>
                                                    "m",
                                                     "i","\u0336",
                                                     " (wet)"))) +
-  scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+  scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -916,7 +915,7 @@ Fig2 <- pamiwa_eBird_presence |>
          y = "Species",
          fill = "Season",
          color = "Season") +
-    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+    scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -935,7 +934,7 @@ Fig2 <- pamiwa_eBird_presence |>
                                                    "m",
                                                     "i","\u0336",
                                                     "\n (wet)"))) +
-    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+    scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -972,6 +971,125 @@ ggsave(filename = "Figure2_heatmap.png",
   # 6.6 x 11 inches
 ```
 ![Heatmap](Figure2_heatmap.png)
+
+```{r eval=FALSE, echo=FALSE}
+
+# Labeller facet_grid
+label_mes <- c(
+  '8' = "ago",
+  '9' = "sep",
+  '10' = "oct", 
+  '11' = "nov",
+  '12' = "dic",
+  '1' = "ene",
+  '2' = "feb",
+  '3' = "mar",
+  '4' = "abr",
+  '5' = "may",
+  '6' = "jun",
+  '7' = "jul"
+  )
+
+
+aco_list |>
+  left_join(pamiwa_eBird_presence) |>
+  full_join(read_csv("calendario_lit_col.csv")) |>
+  filter(!is.na(dataset)) |> # group_by(dataset) |> count()
+  ggplot(aes(y = factor(scientific_name,
+                        levels = rev(spp_levels$scientific_name)), 
+             x = factor(dataset,
+                        levels = c("Pamiwa",
+                                   "Especimenes",
+                                   "Literatura",
+                                   "eBird")),
+             color = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")),
+             fill = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")))) +
+    facet_grid(~factor(month,
+                       levels = c(8:12,1:7)),
+               switch = "x", labeller = as_labeller(label_mes))+
+    geom_tile(alpha = 0.9) +
+    labs(x = "",
+         y = "Especies (642)",
+         fill = "Época",
+         color = "Época") +
+    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D8"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (de transición)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (seca)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (lluvia)"))) +
+    scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D8"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (de transición)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (seca)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (lluvia)"))) +
+    scale_x_discrete(labels = c("Pamiwã", 
+                                "Especímenes",
+                                "Literatura",
+                                "eBird"),
+                     position = "top") +
+    theme_bw()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"), 
+          legend.box.spacing = unit(0, "pt"),
+          strip.background = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.y = element_text(face = "italic", 
+                                     hjust = 1, size = 3.25),
+          axis.text.x = element_text(angle = 65, hjust = 0.1, vjust = -1))
+
+ggsave(filename = "Figura6_heatmap.png",
+      units = "mm", 
+       width = 275, height = 312.5, dpi = 600)
+
+aco_list |>
+    left_join(pamiwa_eBird_presence) |>
+    full_join(read_csv("calendario_lit_col.csv")) |> 
+  mutate(presence = 1) |>
+    filter(!is.na(dataset)) |> 
+  pivot_wider(id_cols = scientific_name, 
+              names_from = c(month,dataset), 
+              names_expand = TRUE, 
+              values_fill = NA, 
+              values_from = presence, 
+              values_fn = mean) |> 
+  write_csv("620 spp Mitu.csv")
+
+```
+
 
 ## Seasonal relative abundance variation - selection
 
@@ -1131,7 +1249,7 @@ Fig_relabu_a <- summary_ebd |>
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
                               "Dec", "Jan", "Feb", 
                               "Mar", "Apr", "May", "Jun", "Jul"))+
-    scale_fill_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+    scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
                                   labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
@@ -1150,7 +1268,7 @@ Fig_relabu_a <- summary_ebd |>
                                                    "m",
                                                     "i","\u0336",
                                                     " (wet)")))+
-  scale_color_manual(values = c("#3B7D23","#C04F15","#4E95D9"),
+  scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
                                   labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
                                                     "m",
