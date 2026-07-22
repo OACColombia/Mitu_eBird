@@ -404,6 +404,71 @@ ebd_eff |>
                                                     "\n (wet)"))) +
   theme_bw() +
   theme(legend.position = "bottom")
+
+ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(year, month, Season) |>
+  count() |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)),
+             y = n,
+             fill = factor(Season,
+                           levels = c("Pamurimi",
+                                      "Ihirimi",
+                                      "Okorimi")))) +
+ # facet_grid(~year) +
+  geom_bar(stat = "identity", aes(alpha = year), color = NA) +
+  labs(x = "Months",
+       y = "Cumulative number of records",
+         fill = "Season",
+         color = "Season") +
+    scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+  theme_bw() +
+  theme(legend.position = "bottom")
 ```
 
 Hacer un "Sankey plot", como el flujo de numero de registros entre los diferentes niveles de filtrar los datos, resultando a las cinco categorías utilizadas.
@@ -604,7 +669,7 @@ pamiwa_richness
 
 Y podemos comparar la riqueza por season en eBird.
 
-Primero, hacer un "summary" de el promedio mensual de riqueza por estacion climática
+Primero, hacer un "summary" de el promedio mensual de riqueza por estación climática
 ```{r}
 eBird_S_montly <- ebd_eff |>
   ungroup() |>
@@ -703,7 +768,7 @@ SppRich_a <- ebd_eff |>
   labs(x = "Month",
        color = "Season",
        fill = "Season",
-       y = "Montly species richness") +
+       y = "Species richness") +
   scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
                      labels = c("Pamurimi" = paste0("Pamur",
                                                     "i","\u0336",
@@ -742,8 +807,12 @@ SppRich_a <- ebd_eff |>
                                                    "m",
                                                     "i","\u0336",
                                                     " (wet)")))+
+  geom_hline(yintercept = c(587, 460, 258), lty = 2, color = "gray30") + 
+  annotate("text", x = 2, y = 607, label = "(eBird = 587)", color = "gray30") +
+  annotate("text", x = 2, y = 480, label = "(Range maps = 460)", color = "gray30") +
+  annotate("text", x = 2, y = 278, label = "(Pamiwã = 258)", color = "gray30") +
   scale_y_continuous(expand = c(0,0), 
-                     limits = c(0,380))+
+                     limits = c(0,620))+
   scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
                               "Dec", "Jan", "Feb", 
                               "Mar", "Apr", "May", "Jun", "Jul"))+
@@ -754,8 +823,26 @@ SppRich_a <- ebd_eff |>
         axis.title.x = element_blank()) 
 SppRich_a 
 
-ggsave(filename = "Fig4_speciesRichness.png", plot = SppRich_a, dpi = 600,
-       units = "mm", width = 168, height = 79)
+ggsave(filename = "Fig4_speciesRichness_edited.jpg", plot = SppRich_a, dpi = 600,
+       units = "mm", width = 168, height = 85)
+
+ebd_eff |>
+  ungroup() |>
+  mutate(Season = ifelse(month %in% c(8:11),"Pamurimi",
+                  ifelse(month %in% c(12,1:2),"Ihirimi",
+                  ifelse(month %in% c(3:7),"Okorimi",
+                  "other")))) |> 
+  filter(category %in% c("Ultrafine",
+                         "Fine",
+                         "Coarse")) |>
+  group_by(Season, year, month, scientific_name) |>
+  count() |> 
+  group_by(Season, year, month) |>
+  count() |>
+  arrange(year) |>
+  pivot_wider(names_from = year, values_from = n) |>
+  arrange(month)
+
 ```
 
 
@@ -972,6 +1059,119 @@ ggsave(filename = "Figure2_heatmap.png",
 ```
 ![Heatmap](Figure2_heatmap.png)
 
+
+Reviewers asked for a figure with subset of species (up to 20)
+```{r}
+NewHeatMap <- pamiwa_eBird_presence |> 
+  filter(scientific_name %in% spp_levels$scientific_name) |>
+  filter(scientific_name %in% c(
+    # five species in the Indigenous calendar were not recovered from the refined eBird dataset
+    "Eudocimus albus", # Pelecaniformes (1/14)
+    "Mitu tomentosum", # Galliformes (1/5)
+    "Mycteria americana", # Ciconiiformes (1/1)
+    "Trogon collaris", # Trogoniformes (1/7)
+    "Zebrilus undulatus", #Pelecaniformes (2/14)
+    # five species were more commonly reported during the wet season (10)
+    "Trogon viridis", # Trogoniformes (2/7)
+    "Bucco macrodactylus", # Galbulifrormes (1/14) 
+    "Neoctanctes niger", # Passeriformes (1/113)
+    "Tyrannus savana", # Passeriformes (2/113)
+    "Sporophila angolensis", # Passeriformes (3/113)
+    # one species more common in dry season (11)
+    "Brotogeris cyanoptera",  # Psittaciformes (1/11)
+    # eight species (two already included, Tyrsav and Mycame) culturally important (17)
+    "Thraupis palmarum", # Passeriformes (4/113)
+    "Thraupis episcopus", # Passeriformes (5/113)
+    "Cissopis leverianus", # Passeriformes (6/113)
+    "Ramphocelus carbo", # Passeriformes (7/113)
+    "Monasa morphoeus", # Galbulifrormes (2/14) 
+    "Crotophaga major", # Cuculiformes (1/6)
+    # Nine other species from orders not represented already or "flashy" for avitourists (26 = ~10%)
+    "Crypturellus duidae", 
+    "Picumnus pumilus",
+    "Selenidera nattereri",
+    "Eubucco richardsoni",
+    "Amazona kawalli", 
+    "Topaza pyra",
+    "Nothocrax urumutum",
+    "Phyllaemulor bracteatus",
+    "Rhegmatorhina cristata")) |>
+  ggplot(aes(y = factor(scientific_name,
+                        levels = rev(spp_levels$scientific_name)), 
+             x = factor(dataset,
+                        levels = c("Pamiwa", 
+                                   "eBird")),
+             color = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")),
+             fill = factor(Season,
+                        levels = c("Pamurimi",
+                                   "Ihirimi",
+                                   "Okorimi")))) +
+    facet_grid(~factor(month,
+                       levels = c(8:12,1:7)),
+               switch = "x", labeller = as_labeller(labe_month))+
+    geom_tile(alpha = 0.8) +
+    labs(x = "",
+         y = "Species (10% subset)",
+         fill = "Season",
+         color = "Season") +
+    scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_color_manual(values = c("#e66101","#fdb863","#5e3c99"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+    scale_x_discrete(labels = c("Pamiwã", "eBird"),
+                     position = "top") +
+    theme_bw()+
+    theme(legend.position = "bottom",
+          legend.text = element_text(face = "italic"), 
+          legend.box.spacing = unit(0, "pt"),
+          strip.background = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.y = element_text(face = "italic", 
+                                     hjust = 1),
+          axis.text.x = element_text(angle = 65, hjust = 0.1, vjust = -1))
+ggsave(filename = "Figure4_heatmap.jpg",
+       plot = NewHeatMap, units = "mm", 
+       width = 150, height = 150, dpi = 300)
+```
+
+
 ```{r eval=FALSE, echo=FALSE}
 
 # Labeller facet_grid
@@ -1096,31 +1296,31 @@ aco_list |>
 ### Frutos de pupuña
 Basado en Vaupés - entre plumas, sonidos y colores de 2018:
 
-\item Thraupis episcopus - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo)
-\item Thraupis palmarum - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo, julio)
+\item *Thraupis episcopus* - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo)
+\item *Thraupis palmarum* - Cuando empezó a cargar frutos erejũe, aviso que ya tenía pepas (agosto, octubre, diciembre, marzo, julio)
 
-\item Cissopis leverianus - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (septiembre,octubre, marzo)
-\item Ramphocelus carbo - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (agosto, octubre, diciembre, marzo)
+\item *Cissopis leverianus* - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (septiembre,octubre, marzo)
+\item *Ramphocelus carbo* - pinikabo las probaba [frutas de pupuña] para saber si estaban listas (agosto, octubre, diciembre, marzo)
 
 
 ### Inicio de época seca
 Basado en Vaupés - entre plumas, sonidos y colores de 2016:
 
-\item Monasa morphoeus - Llega época seca para iniciar quema y siembra. (diciembre, febrero, abril)
+\item *Monasa morphoeus* - Llega época seca para iniciar quema y siembra. (diciembre, febrero, abril)
 
 ### Inicio de época de lluvias
 Basado en Vaupés - entre plumas, sonidos y colores de 2018:
 
-\item Crotophaga major - Kubay les grito; “aunque se escondan en lo más alto del cielo, con la primera lluvia de invierno caerán a la laguna y sufrirán lo que ellos han tenido que aguantar”...  El Ñuiko es un ave que solo aparece en la subienda de los ríos con las primeras lluvias de invierno y desaparece en las épocas de verano, dicen los abuelos que todavía están escondiéndose de Kubay. (marzo)
+\item *Crotophaga major* - Kubay les grito; “aunque se escondan en lo más alto del cielo, con la primera lluvia de invierno caerán a la laguna y sufrirán lo que ellos han tenido que aguantar”...  El Ñuiko es un ave que solo aparece en la subienda de los ríos con las primeras lluvias de invierno y desaparece en las épocas de verano, dicen los abuelos que todavía están escondiéndose de Kubay. (marzo)
 
 ### Migraciones
 Basado en Vaupés - entre plumas, sonidos y colores de 2018:
 
-\item Mycteria americana - "...nosotros tenemos que ir a realizar un trabajo comunitario de mantenimiento y construcción de la maloka donde vive nuestra abuela. Cada año en temporada de inicio de invierno todos la visitamos para dejarle la maloka en buen estado para que la abuela este tranquila y no se moje en el invierno...""...y por eso cada año saben que muchas especies de aves que pasan por bandadas en lo alto de los cielos, van de visita donde la abuela, viajan a un sola dirección y ordenadamente muy relucientes con sus plumones nuevos y cuando regresan, ya no tienen los plumones por que con estos tejieron la maloka de la abuela. Cada año se ven estas migraciones de aves en nuestra región, a comienzo del invierno." (noviembre, marzo)
+\item *Mycteria americana* - "...nosotros tenemos que ir a realizar un trabajo comunitario de mantenimiento y construcción de la maloka donde vive nuestra abuela. Cada año en temporada de inicio de invierno todos la visitamos para dejarle la maloka en buen estado para que la abuela este tranquila y no se moje en el invierno...""...y por eso cada año saben que muchas especies de aves que pasan por bandadas en lo alto de los cielos, van de visita donde la abuela, viajan a un sola dirección y ordenadamente muy relucientes con sus plumones nuevos y cuando regresan, ya no tienen los plumones por que con estos tejieron la maloka de la abuela. Cada año se ven estas migraciones de aves en nuestra región, a comienzo del invierno." (noviembre, marzo)
 
 Adicional:
 
-\item Tyrannus savana: es señal de migración de jaguares de yurupari (octubre, marzo, junio)
+\item *Tyrannus savana*: es señal de migración de jaguares de yurupari (octubre, marzo, junio)
 
 ## Seasonal relative abundance variation - figure
 
@@ -1332,3 +1532,953 @@ ebd_eff |>
 10. obsr769303: Elvis Felipe Quintero Quintero (Bird Guide - Colombia, Meta, Restrepo).
 11. obsr95918: Miguel A Acevedo (Western researcher at the University of Florida - US, Florida, Gainesville).
 12. obsr649861 or obsr3877752: Joint account of John and Mary Clark (Avitoursts - UK, Rhydyclafdy) or group account of adventurescolombia (Tourist operators).
+
+
+# Sampling bias in Colombia (Reviewers 1 question)
+
+```{r eval=FALSE}
+#Integrating multiple data sources to develop range and 
+  #Area of Habitat Maps tailored for local contexts
+
+###~~~~~~~~~~~~~~~~~~~~~~###
+#### ~~~~ PACKAGES ~~~~ ####
+###~~~~~~~~~~~~~~~~~~~~~~###
+library(auk); #eBird data filters
+library(tidyverse) #seven packages in one for data management and visualization
+library(dggridR) #Spatiotemporal Subsampling
+library(maps); #load maps
+library(ggmagnify); # Zoom detail (inset figures) #didnt have this one
+library(terra); library(geodata) #Elevation
+
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
+#### ~~~~ PREPROCESSING eBird DATA ~~~~ ####
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
+
+#select the columns to extract (based on x$col_idx$name) {{This reduces the size of the dataset}}
+colsE <- c("observer_id", "sampling_event_identifier",
+           "group identifier",
+           "common_name", "scientific_name",
+           "observation_count",
+           "country", "state_code", "locality_id", "latitude", "longitude",
+           "protocol_type", "all_species_reported",
+           "observation_date",
+           "time_observations_started",
+           "duration_minutes", "effort_distance_km",
+           "number_observers")
+
+#generate a temporal file to save the filtering eBird data (f_ebd) and sampling (f_sed)
+f_ebd <- "temporalFiltering/ebd_Examples.txt" 
+#f_sed <- "temporalFiltering/sed_Examples.txt" Didn't download when asked :'(
+
+#Spatial grid cells - diameters of ~11km (area of 95.98 ~> ~100 km^2)
+set.seed(123)
+dggs_COL <- dgconstruct(spacing = 1) 
+
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
+#### ~~~~ Birds of Colombia - presence in 1km-cells ~~~~ ####
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
+
+#Filtering ≤2 km, ≤2 hours
+ebd_filt <- auk_ebd("ebd_CO_smp_relMar-2024.txt") %>%
+  auk_distance(distance = c(0,2)) %>%
+  auk_duration(duration = c(0,120))%>%
+  auk_filter(f_ebd, overwrite=T, keep = colsE) %>%
+  read_ebd()
+#4,486,286 records
+
+#Get elevation from package 'geodata' (it requires package 'terra')
+#Resolution 0.5 is near 90m
+DEM <- elevation_global(res = 0.5, path = "DEM/") 
+#if we use only Colombia, we have 80921 NA's, 
+  #all to the edge of the map
+DEM
+
+elevaCOL <- as.data.frame(raster::extract(DEM,ebd_filt[,c("longitude", "latitude")]))
+colnames(elevaCOL) <- c("ID", "Elevation_STR_90m")
+ebd_filt<-cbind(ebd_filt,elevaCOL)
+
+#There are some NA's in Elevation, where?
+#Load a map of the world
+world1 <- sf::st_as_sf(map(database = 'world', plot = FALSE, fill = TRUE))
+world1
+
+ggplot()+
+  geom_sf(data = world1)+
+  geom_point(data = ebd_filt %>% filter(is.na(Elevation_STR_90m)), 
+             aes(x = longitude, y = latitude),
+             color = "red", 
+             size = 0.05)+
+  coord_sf(ylim=c(16.2,-4.5),
+           xlim=c(-82.1,-66.6))+
+  theme_classic()
+
+#We can assume the NA's (61,379) records are at the sea level (0m)
+
+ebd_filt <- ebd_filt %>%
+  mutate(Elevation_STR_90m = ifelse(is.na(Elevation_STR_90m), 0, Elevation_STR_90m))
+
+#Generating grid cells, and extracting center latitude and longitude
+Colombia <- ebd_filt %>%
+  mutate(cell = dgGEO_to_SEQNUM(dggs_COL, #id for cells
+                                longitude, latitude)$seqnum) %>%
+  group_by(cell) %>%
+  mutate(Center_latitude = mean(latitude),
+         Center_longitude = mean(longitude))
+
+#Save as RDS (easy to transfer and reload in other machines)
+saveRDS(Colombia, "Colombia_eBird_Records_elevation_CellID.rds")
+
+Colombia <- readRDS("Colombia_eBird_Records_elevation_CellID.rds")
+# changing the resolution
+dggs_COL <- dgconstruct(spacing = 10) 
+
+Colombia_10k <- Colombia |>
+  ungroup() |>
+  mutate(cell = dgGEO_to_SEQNUM(dggs_COL, longitude, latitude)$seqnum) |>
+  group_by(cell) |>
+  mutate(Center_latitude = mean(latitude),
+         Center_longitude = mean(longitude))
+
+#Get the number of lists in each cell
+CellObservations   <- Colombia_10k %>% 
+  group_by(cell) %>%
+  summarise(count=n()) |>
+  mutate(Log10Lists = log10(count)) #to make sense
+
+#Get the grid cell boundaries for cells which had quakes
+gridColombia <- dgcellstogrid(dggs_COL,CellObservations$cell)
+
+#Update the grid cells' properties to include the number of lists in each cell
+gridColombia <- merge(gridColombia, CellObservations, by.x="seqnum", by.y="cell")
+
+# Handle cells that cross 180 degrees. Something funky happens if no
+wrapped_gridColombia = sf::st_wrap_dateline(gridColombia, 
+                                         options = c("WRAPDATELINE=YES","DATELINEOFFSET=180"), 
+                                        quiet = TRUE)
+
+#save the names of the cell as character, to have the # of lists in the final dataset
+wrapped_gridColombia$cell <- as.character(wrapped_gridColombia$seqnum)
+
+saveRDS(wrapped_gridColombia, "wrapped_gridColombia_10k.rds")
+
+#Presence per cell of each species
+CellColombia <- Colombia_10k |>
+  mutate(cell = as.character(cell),
+         detected = as.integer(all_species_reported),
+         scientific_name = as.factor(scientific_name)) |> 
+  dplyr::select(cell, Center_latitude, Center_longitude, scientific_name, detected) |> 
+  pivot_wider(names_from = "scientific_name", 
+              values_from = "detected",
+              values_fill = 0,
+              values_fn = {max})
+
+CellColombia$Richness_cell <- rowSums(CellColombia[4:ncol(CellColombia)])
+  
+CellColombia <- CellColombia |>
+  left_join(wrapped_gridColombia) |>
+  mutate(N_checklists = count)
+
+#Save as RDS (easy to transfer and reload in other machines)
+saveRDS(CellColombia, "CellID_presence_Spp_10k.rds")
+
+#End of code filtering
+
+# Export to play in QGIS (New map) ####
+CellColombia <- readRDS("CellID_presence_Spp.rds")
+wrapped_gridColombia <- readRDS("wrapped_gridColombia.rds")
+
+gridColombia <- wrapped_gridColombia |>
+  left_join(CellColombia %>% 
+              select(cell, Center_latitude, Center_longitude, Richness_cell))
+
+str(gridColombia)
+
+sf::st_write(gridColombia, "gridColombia_shape_10k.shp")
+sf::st_write(wrapped_gridColombia, "wrapped_gridColombia_shape_10k.shp")
+
+```
+
+# Climate change - Two-Eyed Seeing approach
+
+## Get data online
+To extract the data: 1) login in https://giovanni.gsfc.nasa.gov/giovanni/; 2) Select plot: time series, area-averaged; 3) Select date range (1980-01-01 to 2026-05-31); 4) Select region (-71, 0.85,-69.84, 1.7); 5) select monthly climate variables from MERRA-2 (described below).
+
+The common characteristics among climate variables were
+* Source: MERRA-2 Reanalysis, which is a 2-dimensional data collection in MERRA-2 consisting in statistics, such as mean (or minimum and maximum) air temperature at 2-meter, or total precipitation.
+* Temporal resolution: *Monthly*
+* Spatial resolution: 0.5x0.625°
+* Begin date: 1980-01-01 | End date: 2026-05-31
+* Reference for temperature variables: Global Modeling and Assimilation Office (GMAO) (2015), MERRA-2 statM_2d_slv_Nx: 2d, Monthly, Aggregated Statistics, Single-Level, Assimilation, Single-Level Diagnostics V5.12.4, Greenbelt, MD, USA, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: 05/10/2026, 10.5067/KVIMOMCUO83U
+* Reference for precipitation: Global Modeling and Assimilation Office—GMAO. 2015. MERRA-2 statM_2d_slv_Nx: 2d, monthly, aggregated statistics, single-level assimilation, single-level diagnostics V5.12.4, Greenbelt, MD, USA, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: [05/10/2026], https://doi.org/10.5067/KVIMOMCUO83U
+
+The climate variables and the descriptions:
+1. *2-meter air temperature - daily max* (M2SMNXSLV v5.12.4); units: C
+1. *2-meter air temperature - daily mean* (M2SMNXSLV v5.12.4); units: C
+1. *2-meter air temperature - daily min* (M2SMNXSLV v5.12.4); units: C
+1. *Bias corrected total surface precipitation* (M2TMNXFLX v5.12.4); units: mm/day
+
+I saved data 
+
+## Upload data from the csv files downloaded
+
+```{r load Giovanny data, eval=TRUE}
+
+tmaxi_pamiwa <- read_csv("MERRA_data/g4.areaAvgTimeSeries.M2SMNXSLV_5_12_4_T2MMAX.19800101-20260531.71W_0N_69W_1N.csv", skip = 7) |>
+  rename(tmax = mean_M2SMNXSLV_5_12_4_T2MMAX)
+tmean_pamiwa <- read_csv("MERRA_data/g4.areaAvgTimeSeries.M2SMNXSLV_5_12_4_T2MMEAN.19800101-20260531.71W_0N_69W_1N.csv", skip = 7) |>
+  rename(tmean = M2SMNXSLV_5_12_4_T2MMEAN)
+tmini_pamiwa <- read_csv("MERRA_data/g4.areaAvgTimeSeries.M2SMNXSLV_5_12_4_T2MMIN.19800101-20260531.71W_0N_69W_1N.csv", skip = 7) |>
+  rename(tmin = M2SMNXSLV_5_12_4_T2MMIN)
+preci_pamiwa <- read_csv("MERRA_data/g4.areaAvgTimeSeries.M2TMNXFLX_5_12_4_PRECTOTCORR.19800101-20260531.71W_0N_69W_1N.csv", skip = 7) |>
+  rename(precipitation = M2TMNXFLX_5_12_4_PRECTOTCORR)
+
+Pamiwa_climate <- tmaxi_pamiwa |>
+  left_join(tmean_pamiwa) |>
+  left_join(tmini_pamiwa) |>
+  left_join(preci_pamiwa) |>
+  mutate(month_num = month(time),
+         Season = ifelse(month_num %in% c(8:11),"Pamurimi",
+                  ifelse(month_num %in% c(12,1:2),"Ihirimi",
+                  ifelse(month_num %in% c(3:7),"Okorimi",
+                  "other"))))
+```
+
+## Harmonic regressions for our study site
+
+Here we are using the forecast package and a time series `ts` object.
+```{r harmonics, eval=TRUE, include=TRUE}
+library(forecast)
+library(patchwork)
+
+# 46 years of monthly data (557 obs.)
+
+# set y axis ranges for temperature
+min(Pamiwa_climate$tmin) # 20.5
+max(Pamiwa_climate$tmax) # 32.5
+
+### Min temperature (C) ####
+
+# select variable to test
+ts_tmin = ts(Pamiwa_climate$tmin, start = 1980, frequency = 12)
+
+# 1. split into training (first 10 years) and test (rest)
+train_length <- 10 * 12  # 10 years and 12 months
+train_ts_tmin <- window(ts_tmin, end = c(1994, 12))
+test_ts_tmin  <- window(ts_tmin, start = c(1995, 1))
+
+# Select by AICc the best number of harmonics (1 to 6)
+fits <- lapply(1:6, function(k) {
+  auto.arima(
+    train_ts_tmin,
+    xreg = fourier(train_ts_tmin, K = k),
+    seasonal = FALSE
+  )
+})
+
+sapply(fits, function(x) x$aicc)
+
+# 2. fit harmonic regression on training data
+K <- which.min(sapply(fits, function(x) x$aicc))  # number of harmonics (max 6)
+
+train_fourier <- fourier(train_ts_tmin, K = K)
+
+harm_tmin <- auto.arima(train_ts_tmin, xreg = train_fourier,
+                        seasonal = FALSE, lambda = "auto")
+# fitted values from harmonic regression
+fitted_tmin <- fitted(harm_tmin)
+
+# average fitted values by calendar month
+monthly_cycle_tmin <- tapply(
+  fitted_tmin,
+  cycle(train_ts_tmin),
+  mean
+)
+
+monthly_cycle_tmin
+
+season_df_tmin <- data.frame(
+  month = 1:12,
+  tmin = as.numeric(monthly_cycle_tmin)
+)
+
+ggplot(season_df_tmin, aes(month, tmin)) +
+  geom_hline(yintercept = mean(season_df_tmin$tmin), lty = 2) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(x = "Month", y = "Minimum temperature") +
+  theme_bw()
+
+season_df_tmin <- season_df_tmin |>
+  mutate(IK_season = ifelse(month %in% c(8:11),"Pamurimi",
+                     ifelse(month %in% c(12,1:2),"Ihirimi",
+                     ifelse(month %in% c(3:7),"Okorimi",
+                     "other"))))
+season_df_tmin
+
+aggregate(
+  tmin ~ IK_season,
+  data = season_df_tmin,
+  mean
+)
+
+# 3. forecast for the length of the test set
+h <- length(test_ts_tmin)
+test_fourier <- fourier(train_ts_tmin, K = K, h = h)
+
+fc_tmin <- forecast(harm_tmin, xreg = test_fourier, h = h)
+
+# plot observed points + fitted + forecast ---
+ts_tmin_hr = ggplot() +
+  geom_point(aes(x = time(ts_tmin), y = ts_tmin),
+             color = "grey50", size = 1) +
+  autolayer(fitted(harm_tmin), series = "Fitted", color = "#0474BA") +
+  autolayer(fc_tmin$mean, series = "Forecast", color = "#F17720") +
+  labs(y = "Minimum\ntemperature (°C)", x = "Year", 
+       fill = "Period:", color = "Period:") +
+#  scale_y_continuous(limits = c(20.5,32.5)) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+# extract the residuals
+checkresiduals(harm_tmin)
+
+# fitted values for training
+fitted_vals <- fitted(harm_tmin)
+residuals_train <- train_ts_tmin - fitted_vals
+
+# forecast vs observed for test
+residuals_test <- test_ts_tmin - fc_tmin$mean
+
+# combine into one data frame
+residuals_all_tmin <- data.frame(
+  date = c(time(train_ts_tmin), time(test_ts_tmin)),
+  resid = c(as.numeric(residuals_train), as.numeric(residuals_test)),
+  period = c(rep("Training", length(residuals_train)),
+             rep("Forecast", length(residuals_test))))
+residuals_all_tmin$period = factor(residuals_all_tmin$period, levels =
+                                     c("Training", "Forecast"))
+# plot residuals
+ts_tmin_res = ggplot(residuals_all_tmin, aes(x = date, y = resid, color = period)) +
+  geom_point(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Training" = "#0474BA", "Forecast" = "#F17720")) +
+  labs(x = "Year", y = "Residuals",
+       fill = "Period:", color = "Period:") +
+  theme_bw()+
+  guides(color = guide_legend(override.aes = list(size = 2))) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+plot_ts_tmin = ts_tmin_hr / ts_tmin_res +
+  plot_layout(ncol = 1, guides = 'collect',
+              axes = "collect") & 
+  theme(legend.position = 'bottom')
+
+### Max temperature (C) ####
+# select variable to test
+ts_tmax = ts(Pamiwa_climate$tmax, start = 1980, frequency = 12)
+
+# 1. split into training (first 10 years) and test (rest)
+train_length <- 10 * 12   # 10 years and 12 months
+train_ts_tmax <- window(ts_tmax, end = c(1994, 12))
+test_ts_tmax  <- window(ts_tmax, start = c(1995, 1))
+
+# Select by AICc the best number of harmonics (1 to 6)
+fits <- lapply(1:6, function(k) {
+  auto.arima(
+    train_ts_tmax,
+    xreg = fourier(train_ts_tmax, K = k),
+    seasonal = FALSE
+  )
+})
+
+sapply(fits, function(x) x$aicc)
+
+# 2. fit harmonic regression on training data
+K <- which.min(sapply(fits, function(x) x$aicc))  # number of harmonics (max 6)
+train_fourier <- fourier(train_ts_tmax, K = K)
+
+harm_tmax <- auto.arima(train_ts_tmax, xreg = train_fourier,
+                        seasonal = FALSE, lambda = "auto")
+
+# fitted values from harmonic regression
+fitted_tmax <- fitted(harm_tmax)
+
+# average fitted values by calendar month
+monthly_cycle_tmax <- tapply(
+  fitted_tmax,
+  cycle(train_ts_tmax),
+  mean
+)
+
+monthly_cycle_tmax
+
+season_df_tmax <- data.frame(
+  month = 1:12,
+  tmax = as.numeric(monthly_cycle_tmax)
+)
+
+ggplot(season_df_tmax, aes(month, tmax)) +
+  geom_hline(yintercept = mean(season_df_tmax$tmax), lty = 2) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(x = "Month", y = "Maximum temperature") +
+  theme_bw()
+
+season_df_tmax <- season_df_tmax |>
+  mutate(IK_season = ifelse(month %in% c(8:11),"Pamurimi",
+                     ifelse(month %in% c(12,1:2),"Ihirimi",
+                     ifelse(month %in% c(3:7),"Okorimi",
+                     "other"))))
+season_df_tmax
+
+aggregate(
+  tmax ~ IK_season,
+  data = season_df_tmax,
+  mean
+)
+
+# 3. forecast for the length of the test set
+h <- length(test_ts_tmax)
+test_fourier <- fourier(train_ts_tmax, K = K, h = h)
+
+fc_tmax <- forecast(harm_tmax, xreg = test_fourier, h = h)
+
+# plot observed points + fitted + forecast ---
+ts_tmax_hr = ggplot() +
+  geom_point(aes(x = time(ts_tmax), y = ts_tmax),
+             color = "grey50", size = 1) +
+  autolayer(fitted(harm_tmax), series = "Fitted", color = "#0474BA") +
+  autolayer(fc_tmax$mean, series = "Forecast", color = "#F17720") +
+  labs(y = "Maximum\ntemperature (°C)", x = "Year", tag = "A",
+       fill = "Period:", color = "Period:") +
+ # scale_y_continuous(limits = c(20.5,32.5)) +
+   theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+# extract the residuals
+checkresiduals(harm_tmax)
+
+# fitted values for training
+fitted_vals <- fitted(harm_tmax)
+residuals_train <- train_ts_tmax - fitted_vals
+
+# forecast vs observed for test
+residuals_test <- test_ts_tmax - fc_tmax$mean
+
+# combine into one data frame
+residuals_all_tmax <- data.frame(
+  date = c(time(train_ts_tmax), time(test_ts_tmax)),
+  resid = c(as.numeric(residuals_train), as.numeric(residuals_test)),
+  period = c(rep("Training", length(residuals_train)),
+             rep("Forecast", length(residuals_test))))
+residuals_all_tmax$period = factor(residuals_all_tmax$period, levels =
+                                     c("Training", "Forecast"))
+
+# plot residuals
+ts_tmax_res = ggplot(residuals_all_tmax, aes(x = date, y = resid, color = period)) +
+  geom_point(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Training" = "#0474BA", "Forecast" = "#F17720")) +
+  labs(x = "Year", y = "Residuals", tag = "B",
+       fill = "Period:", color = "Period:") +
+  theme_bw()+
+  guides(color = guide_legend(override.aes = list(size = 2))) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+plot_ts_tmax = ts_tmax_hr / ts_tmax_res+
+  plot_layout(ncol = 1, guides = 'collect',
+              axes = "collect") & 
+  theme(legend.position = 'bottom')
+
+### Mean temperature (C) ####
+
+# select variable to test
+ts_tmean = ts(Pamiwa_climate$tmean, start = 1980, frequency = 12)
+
+# 1. split into training (first 10 years) and test (rest)
+train_length <- 10 * 12   # 10 years and 12 months
+train_ts_tmean <- window(ts_tmean, end = c(1994, 12))
+test_ts_tmean  <- window(ts_tmean, start = c(1995, 1))
+
+# Select by AICc the best number of harmonics (1 to 6)
+fits <- lapply(1:6, function(k) {
+  auto.arima(
+    train_ts_tmean,
+    xreg = fourier(train_ts_tmean, K = k),
+    seasonal = FALSE
+  )
+})
+
+sapply(fits, function(x) x$aicc)
+
+# 2. fit harmonic regression on training data
+K <- which.min(sapply(fits, function(x) x$aicc))  # number of harmonics ( max 6)
+train_fourier <- fourier(train_ts_tmean, K = K)
+
+harm_tmean <- auto.arima(train_ts_tmean, xreg = train_fourier,
+                        seasonal = FALSE, lambda = "auto")
+
+# fitted values from harmonic regression
+fitted_tmean <- fitted(harm_tmean)
+
+# average fitted values by calendar month
+monthly_cycle_tmean <- tapply(
+  fitted_tmean,
+  cycle(train_ts_tmean),
+  mean
+)
+
+monthly_cycle_tmean
+
+season_df_tmean <- data.frame(
+  month = 1:12,
+  tmean = as.numeric(monthly_cycle_tmean)
+)
+
+ggplot(season_df_tmean, aes(month, tmean)) +
+  geom_hline(yintercept = mean(season_df_tmean$tmean), lty = 2) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(x = "Month", y = "Mean temperature") +
+  theme_bw()
+
+season_df_tmean <- season_df_tmean |>
+  mutate(IK_season = ifelse(month %in% c(8:11),"Pamurimi",
+                     ifelse(month %in% c(12,1:2),"Ihirimi",
+                     ifelse(month %in% c(3:7),"Okorimi",
+                     "other"))))
+season_df_tmean
+
+aggregate(
+  tmean ~ IK_season,
+  data = season_df_tmean,
+  mean
+)
+
+# 3. forecast for the length of the test set
+h <- length(test_ts_tmean)
+test_fourier <- fourier(train_ts_tmean, K = K, h = h)
+
+fc_tmean <- forecast(harm_tmean, xreg = test_fourier, h = h)
+
+# plot observed points + fitted + forecast ---
+ts_tmean_hr = ggplot() +
+  geom_point(aes(x = time(ts_tmean), y = ts_tmean),
+             color = "grey50", size = 1) +
+  autolayer(fitted(harm_tmean), series = "Fitted", color = "#0474BA") +
+  autolayer(fc_tmean$mean, series = "Forecast", color = "#F17720") +
+  labs(y = "Mean\ntemperature (°C)", x = "Year",
+       fill = "Period:", color = "Period:") +
+  # scale_y_continuous(limits = c(20.5,32.5)) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+# extract the residuals
+checkresiduals(harm_tmean)
+
+# fitted values for training
+fitted_vals <- fitted(harm_tmean)
+residuals_train <- train_ts_tmean - fitted_vals
+
+# forecast vs observed for test
+residuals_test <- test_ts_tmean - fc_tmean$mean
+
+# combine into one data frame
+residuals_all_tmean <- data.frame(
+  date = c(time(train_ts_tmean), time(test_ts_tmean)),
+  resid = c(as.numeric(residuals_train), as.numeric(residuals_test)),
+  period = c(rep("Training", length(residuals_train)),
+             rep("Forecast", length(residuals_test))))
+residuals_all_tmean$period = factor(residuals_all_tmean$period, levels =
+                                     c("Training", "Forecast"))
+
+# plot residuals
+ts_tmean_res = ggplot(residuals_all_tmean, aes(x = date, y = resid, color = period)) +
+  geom_point(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Training" = "#0474BA", "Forecast" = "#F17720")) +
+  labs(x = "Year", y = "Residuals",
+       fill = "Period:", color = "Period:") +
+  theme_bw()+
+  guides(color = guide_legend(override.aes = list(size = 2))) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+plot_ts_tmean = ts_tmean_hr / ts_tmean_res +
+  plot_layout(ncol = 1, guides = 'collect',
+              axes = "collect") & 
+  theme(legend.position = 'bottom')
+
+### Precipitation (mm/day) ####
+# select precipitation
+ts_prec = ts(Pamiwa_climate$precipitation, start = 1980, frequency = 12)
+
+# 1. split into training (first 10 years) and test (rest)
+train_length <- 10 * 12   # 10 years of monthly data
+train_ts_prec <- window(ts_prec, end = c(1994, 12))
+test_ts_prec  <- window(ts_prec, start = c(1995, 1))
+
+# Select by AICc the best number of harmonics (1 to 6)
+fits <- lapply(1:6, function(k) {
+  auto.arima(
+    train_ts_prec,
+    xreg = fourier(train_ts_prec, K = k),
+    seasonal = FALSE
+  )
+})
+
+sapply(fits, function(x) x$aicc)
+
+# 2. fit harmonic regression on training data
+K <- which.min(sapply(fits, function(x) x$aicc))  # number of harmonics (max 6)
+train_fourier <- fourier(train_ts_prec, K = K)
+
+harm_prec <- auto.arima(train_ts_prec, xreg = train_fourier,
+                        seasonal = FALSE, lambda = "auto")
+
+# fitted values from harmonic regression
+fitted_prec <- fitted(harm_prec)
+
+# average fitted values by calendar month
+monthly_cycle_prec <- tapply(
+  fitted_prec,
+  cycle(train_ts_prec),
+  mean
+)
+
+monthly_cycle_prec
+
+season_df_prec <- data.frame(
+  month = 1:12,
+  precip = as.numeric(monthly_cycle_prec)
+)
+
+ggplot(season_df_prec, aes(month, precip)) +
+  geom_hline(yintercept = mean(season_df_prec$precip), lty = 2) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(x = "Month", y = "Precipitation (mm/day)") +
+  theme_bw()
+
+season_df_prec <- season_df_prec |>
+  mutate(IK_season = ifelse(month %in% c(8:11),"Pamurimi",
+                     ifelse(month %in% c(12,1:2),"Ihirimi",
+                     ifelse(month %in% c(3:7),"Okorimi",
+                     "other"))))
+season_df_prec
+
+aggregate(
+  precip ~ IK_season,
+  data = season_df_prec,
+  mean
+)
+
+# 3. forecast for the length of the test set
+h <- length(test_ts_prec)
+test_fourier <- fourier(train_ts_prec, K = K, h = h)
+
+fc_prec <- forecast(harm_prec, xreg = test_fourier, h = h)
+
+# plot observed points + fitted + forecast ---
+ts_prec_hr = ggplot() +
+  geom_point(aes(x = time(ts_prec), y = ts_prec),
+             color = "grey50", size = 1) +
+  autolayer(fitted(harm_prec), series = "Fitted", color = "#0474BA") +
+  autolayer(fc_prec$mean, series = "Forecast", color = "#F17720") +
+  labs(y = "Precipitation\n(mm/day)", x = "Year",
+       fill = "Period:", color = "Period:") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+# extract the residuals
+checkresiduals(harm_prec)
+
+# fitted values for training
+fitted_vals <- fitted(harm_prec)
+residuals_train <- train_ts_prec - fitted_vals
+
+# forecast vs observed for test
+residuals_test <- test_ts_prec - fc_prec$mean
+
+# combine into one data frame
+residuals_all_prec <- data.frame(
+  date = c(time(train_ts_prec), time(test_ts_prec)),
+  resid = c(as.numeric(residuals_train), as.numeric(residuals_test)),
+  period = c(rep("Training", length(residuals_train)),
+             rep("Forecast", length(residuals_test))),
+  IK_season = c(rep(c("Ihirimi", "Ihirimi", "Okorimi", "Okorimi", "Okorimi", "Okorimi", 
+                      "Okorimi", "Pamurimi", "Pamurimi", "Pamurimi", "Pamurimi", "Ihirimi"), 
+                    46),
+                "Ihirimi", "Ihirimi", "Okorimi", "Okorimi", "Okorimi"))
+
+residuals_all_prec$period = factor(residuals_all_prec$period, levels =
+                                     c("Training", "Forecast"))
+
+residuals_all_prec |>
+  filter(period == "Forecast") |>
+  aggregate(resid ~ IK_season, mean)
+
+aggregate(
+  resid ~ IK_season,
+  data = residuals_all_prec,
+  mean
+)
+
+# plot residuals
+ts_prec_res = ggplot(residuals_all_prec, 
+                        aes(x = date, y = resid, color = period)) +
+  geom_point(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Training" = "#0474BA", "Forecast" = "#F17720")) +
+  labs(x = "Year", y = "Residuals",
+       fill = "Period:", color = "Period:") +
+  theme_bw()+
+  guides(color = guide_legend(override.aes = list(size = 2))) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0),"lines"),
+        legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-5,-10,-10,-10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15))
+
+plot_ts_prec = ts_prec_hr / ts_prec_res +
+  plot_layout(ncol = 1, guides = 'collect',
+              axes = "collect") & 
+  theme(legend.position = 'bottom')
+
+# Figure composition
+plot_ts_harm = 
+  ts_tmax_hr +
+  ts_tmean_hr +
+  ts_tmin_hr +
+  ts_prec_hr +
+  plot_layout(ncol = 1, guides = 'collect', axes = "collect") & 
+  theme(legend.position = 'bottom',
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,-10,-10,-10))
+
+plot_ts_res = 
+  ts_tmax_res +
+  ts_tmean_res +
+  ts_tmin_res +
+  ts_prec_res +
+  plot_layout(ncol = 1, guides = 'collect', axes = "collect") & 
+  theme(legend.position = 'bottom',
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,-10,-10,-10))
+
+# remove legends
+plot_ts_res_nl = 
+  ts_tmax_res +
+  ts_tmean_res +
+  ts_tmin_res +
+  ts_prec_res +
+  plot_layout(ncol = 1, guides = 'collect', axes = "collect") & 
+  theme(legend.position = 'none',
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,-10,-10,-10))
+```
+
+```{r}
+library(cowplot)
+
+legend_only_res <- get_legend(ts_tmin_res)
+
+figure_pamiwa_harmonic <- ggdraw() +
+  draw_plot(plot_ts_harm, x = 0.0, y = 0.01, width = 0.5, height = 0.99) +
+  draw_plot(plot_ts_res_nl, x = 0.5, y = 0.01, width = 0.5, height = 0.99) + 
+  draw_plot(legend_only_res, x = 0.25, y = 0.015, width = 0.5, height = 0.01) 
+
+ggsave(figure_pamiwa_harmonic, file = "figure_pamiwa_harmonic.jpg", 
+       width = 12, height = 9, dpi = 300, units = "in")
+```
+
+```{r}
+# add the mean forecast for each month
+season_df_tmin$tmin_fc <- tapply(test_ts_tmin,
+                                 cycle(test_ts_tmin),
+                                 mean)
+season_df_tmean$tmean_fc <- tapply(test_ts_tmean,
+                                 cycle(test_ts_tmean),
+                                 mean)
+season_df_tmax$tmax_fc <- tapply(test_ts_tmax,
+                                 cycle(test_ts_tmax),
+                                 mean)
+season_df_prec$precip_fc <- tapply(test_ts_prec,
+                                 cycle(test_ts_prec),
+                                 mean)
+
+
+# Text to display per group
+text_Aru <- data.frame(
+  Variable = c("Maximum temperature (ºC)", "Mean temperature (ºC)", "Minimum temperature (ºC)", "Precipitation (mm/day)"),
+  X = 0.5,
+  Y = c(29, 25.5, 23, 11.5),
+  Label = "Arú"
+)
+
+season_bg <- data.frame(
+  Season = c("Ihirimi", "Pamurimi", "Okorimi"),
+  xmin = c(0.5, 5, 8),
+  xmax = c(5, 8, 12.5),
+  ymin = -Inf,
+  ymax = Inf
+)
+
+
+figure_climate_a <- season_df_tmin |>
+  left_join(season_df_tmean) |>
+  left_join(season_df_tmax) |>
+  left_join(season_df_prec) |>
+  pivot_longer(cols = !c(month, IK_season), names_to = "Variable") |>
+  mutate(Period = rep(c("Expected (1980-1995)", "Observed (1995-2026)"), 48),
+         Variable = case_when(Variable == "tmin" ~ "Minimum temperature (ºC)",
+                              Variable == "tmin_fc" ~ "Minimum temperature (ºC)",
+                              Variable == "tmean" ~ "Mean temperature (ºC)",
+                              Variable == "tmean_fc" ~ "Mean temperature (ºC)",
+                              Variable == "tmax" ~ "Maximum temperature (ºC)",
+                              Variable == "tmax_fc" ~ "Maximum temperature (ºC)",
+                              Variable == "precip" ~ "Precipitation (mm/day)",
+                              Variable == "precip_fc" ~ "Precipitation (mm/day)",
+                              TRUE ~ NA)) |>
+  ggplot(aes(x = factor(month,
+                        levels = c(8:12,1:7)), y = value, color = Period)) +
+  geom_vline(xintercept = c(11.75,1.25), lty = 3, color = "gray20") +
+  geom_text(data = text_Aru, aes(x = X, y = Y, label = Label), color = "gray20") +
+  geom_rect(
+    data = season_bg,
+    aes(xmin = xmin, xmax = xmax,
+        ymin = ymin, ymax = ymax,
+        fill = factor(Season, 
+                      levels = c("Pamurimi",
+                                 "Ihirimi",
+                                 "Okorimi"))),
+    inherit.aes = FALSE,
+    alpha = 0.2
+  ) +
+  # annotate("rect", xmin = 0.5, xmax = 5, ymin = -Inf, ymax = Inf, alpha = 0.2, color = NA,
+  #          fill = "#e66101") +
+  # annotate("rect", xmin = 5, xmax = 8, ymin = -Inf, ymax = Inf, alpha = 0.2, color = NA,
+  #          fill = "#fdb863") +
+  # annotate("rect", xmin = 8, xmax = 12.5, ymin = -Inf, ymax = Inf, alpha = 0.2, color = NA,
+  #          fill = "#5e3c99") +
+  facet_wrap(~ Variable, scales = "free_y") +
+  geom_point() +
+  geom_line(aes(group = Period, lty = Period), alpha = 0.7) +
+  scale_x_discrete(labels = c("Aug","Sep","Oct", "Nov",
+                              "Dec", "Jan", "Feb", 
+                              "Mar", "Apr", "May", "Jun", "Jul"))+
+  scale_color_manual(values = c("black", "red")) +
+  scale_linetype_manual(values = c(1,2)) +
+   scale_fill_manual(values = c("#e66101","#fdb863","#5e3c99"),
+                     labels = c("Pamurimi" = paste0("Pamur",
+                                                    "i","\u0336",
+                                                    "m",
+                                                    "i","\u0336",
+                                                    "\n (transition)"),
+                                "Ihirimi" = paste0("I","\u0336",
+                                                   "h",
+                                                   "i","\u0336",
+                                                   "r",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (dry)"),
+                                "Okorimi" = paste0("Okor",
+                                                   "i","\u0336",
+                                                   "m",
+                                                    "i","\u0336",
+                                                    "\n (wet)"))) +
+  labs(x = "Month", y = "", color = "", fill = "Season", linetype = "") +
+  theme_bw() +
+  coord_polar() +
+  theme(strip.background = element_blank(), 
+        legend.position = "bottom") +
+  guides(
+  fill = guide_legend(
+    order = 1,
+    label.theme = element_text(face = "italic")
+  ),
+  color = guide_legend(
+    order = 2,
+    label.theme = element_text(face = "plain")
+  ),
+  linetype = guide_legend(
+    order = 2,
+    label.theme = element_text(face = "plain")
+  )
+)
+
+ggsave(figure_climate_a, file = "figure_pamiwa_clima.jpg", 
+       width = 8, height = 7, dpi = 300, units = "in")
+```
