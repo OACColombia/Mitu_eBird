@@ -1166,9 +1166,9 @@ NewHeatMap <- pamiwa_eBird_presence |>
           axis.text.y = element_text(face = "italic", 
                                      hjust = 1),
           axis.text.x = element_text(angle = 65, hjust = 0.1, vjust = -1))
-ggsave(filename = "Figure4_heatmap.jpg",
+ggsave(filename = "Figure4_heatmap.png",
        plot = NewHeatMap, units = "mm", 
-       width = 150, height = 150, dpi = 300)
+       width = 150, height = 130, dpi = 600)
 ```
 
 
